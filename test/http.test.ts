@@ -87,3 +87,89 @@ test("dependency errors return 502 without leaking credentials", async (t) => {
   assert.equal(response.status, 502);
   assert.ok(!(await response.text()).includes("secret-token"));
 });
+
+test("HTTP tool dispatch validates and authenticates document mutations with domain status codes", async (t) => {
+  const { rag } = fixture();
+  const server = createHttpServer(rag, { apiKey: "test-key" });
+  const url = await listen(server);
+  t.after(() => close(server));
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: "Bearer test-key",
+  };
+  const call = (name: string, args: unknown, auth = true) =>
+    fetch(`${url}/v1/tools/call`, {
+      method: "POST",
+      headers: auth ? headers : { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, arguments: args }),
+    });
+  const definitions = (await (
+    await fetch(`${url}/v1/tools`, { headers })
+  ).json()) as { tools: { function: { name: string } }[] };
+  assert.equal(definitions.tools.length, 6);
+  const target = { namespace: "default", source: "http-notes.md" };
+  assert.equal(
+    (await call("rag_add_document", { ...target, text: "新资料" }, false))
+      .status,
+    401,
+  );
+  assert.equal((await rag.listDocuments()).totalDocuments, 0);
+  assert.equal(
+    (await call("rag_add_document", { source: target.source, text: "新资料" }))
+      .status,
+    400,
+  );
+  assert.equal(
+    (await call("rag_add_document", { ...target, text: "新资料" })).status,
+    200,
+  );
+  assert.equal(
+    (await call("rag_add_document", { ...target, text: "误覆盖" })).status,
+    409,
+  );
+  assert.equal(
+    (
+      await call("rag_update_document", {
+        ...target,
+        namespace: "missing",
+        text: "新版本",
+      })
+    ).status,
+    404,
+  );
+  assert.equal(
+    (await call("rag_update_document", { ...target, text: "新版本资料" }))
+      .status,
+    200,
+  );
+  const read = await call("rag_get_document", target);
+  assert.equal(read.status, 200);
+  assert.equal(
+    ((await read.json()) as { chunks: { text: string }[] }).chunks[0]!.text,
+    "新版本资料",
+  );
+  assert.equal(
+    (await call("rag_delete_document", { ...target, filter: {} })).status,
+    400,
+  );
+  assert.equal((await call("rag_delete_document", target, false)).status, 401);
+  const wrongNamespace = await call("rag_delete_document", {
+    ...target,
+    namespace: "missing",
+  });
+  assert.equal(
+    ((await wrongNamespace.json()) as { deleted: boolean }).deleted,
+    false,
+  );
+  assert.equal((await rag.listDocuments()).totalDocuments, 1);
+  const deleted = await call("rag_delete_document", target);
+  assert.equal(
+    ((await deleted.json()) as { deletedChunks: number }).deletedChunks,
+    1,
+  );
+  assert.equal((await call("rag_get_document", target)).status, 404);
+  assert.equal(
+    (await call("rag_update_document", { ...target, text: "新版本" })).status,
+    404,
+  );
+});

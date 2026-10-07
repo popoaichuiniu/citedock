@@ -34,6 +34,25 @@ export class MemoryStore implements VectorStore {
       if (point.payload.documentId === documentId) this.points.delete(id);
     for (const point of points) this.points.set(point.id, point);
   }
+  async documentExists(documentId: string, namespace: string) {
+    return [...this.points.values()].some(
+      ({ payload }) =>
+        payload.documentId === documentId && payload.namespace === namespace,
+    );
+  }
+  async deleteDocument(documentId: string, namespace: string) {
+    let deleted = 0;
+    for (const [id, { payload }] of this.points) {
+      if (
+        payload.documentId === documentId &&
+        payload.namespace === namespace
+      ) {
+        this.points.delete(id);
+        deleted++;
+      }
+    }
+    return deleted;
+  }
   async search(
     _vector: number[],
     options: SearchOptions,

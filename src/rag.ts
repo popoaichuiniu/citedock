@@ -16,6 +16,12 @@ import {
   documentIdSchema,
   type DocumentListInput,
   type ChunkListInput,
+  documentTargetSchema,
+  documentWriteSchema,
+  documentReadSchema,
+  type DocumentTargetInput,
+  type DocumentWriteInput,
+  type DocumentReadInput,
 } from "./schema.js";
 import { QdrantStore, type VectorStore } from "./store.js";
 
@@ -33,6 +39,21 @@ type PreparedDocument = {
 
 function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+export function documentIdFor(namespace: string, source: string): string {
+  return digest(JSON.stringify([namespace, source]));
+}
+export class DocumentExistsError extends Error {
+  constructor() {
+    super("Document already exists; use rag_update_document to replace it");
+    this.name = "DocumentExistsError";
+  }
+}
+export class DocumentNotFoundError extends Error {
+  constructor() {
+    super("Document not found in the specified namespace and source");
+    this.name = "DocumentNotFoundError";
+  }
 }
 export function chunkId(documentId: string, index: number): string {
   const bytes = Buffer.from(
@@ -65,6 +86,59 @@ export class RagService {
     }));
   }
 
+  async addDocument(input: DocumentWriteInput) {
+    return this.writeTextDocument(documentWriteSchema.parse(input), "create");
+  }
+
+  async updateDocument(input: DocumentWriteInput) {
+    return this.writeTextDocument(documentWriteSchema.parse(input), "update");
+  }
+
+  private writeTextDocument(
+    document: ReturnType<typeof documentWriteSchema.parse>,
+    mode: "create" | "update",
+  ) {
+    return this.writeDocument(
+      document,
+      async () => ({
+        chunks: chunkText(
+          document.text,
+          this.config.CHUNK_SIZE,
+          this.config.CHUNK_OVERLAP,
+        ),
+        metadata: document.metadata,
+      }),
+      mode,
+    );
+  }
+
+  async deleteDocument(input: DocumentTargetInput) {
+    const target = documentTargetSchema.parse(input);
+    const documentId = documentIdFor(target.namespace, target.source);
+    return this.serializeWrite(documentId, async () => {
+      const deletedChunks = await this.store.deleteDocument(
+        documentId,
+        target.namespace,
+      );
+      return {
+        documentId,
+        ...target,
+        deleted: deletedChunks > 0,
+        deletedChunks,
+      };
+    });
+  }
+
+  async getDocument(input: DocumentReadInput) {
+    const { source, ...options } = documentReadSchema.parse(input);
+    const result = await this.store.listChunks(
+      documentIdFor(options.namespace, source),
+      options,
+    );
+    if (!result.total) throw new DocumentNotFoundError();
+    return { ...result, source };
+  }
+
   async ingestPdf(input: PdfIngestInput) {
     const document = pdfIngestSchema.parse(input);
     return this.writeDocument(document, async () => {
@@ -95,48 +169,57 @@ export class RagService {
   private async writeDocument(
     document: DocumentInfo,
     prepare: () => Promise<PreparedDocument>,
+    mode: "upsert" | "create" | "update" = "upsert",
   ) {
-    const documentId = digest(
-      JSON.stringify([document.namespace, document.source]),
-    );
+    const documentId = documentIdFor(document.namespace, document.source);
+    return this.serializeWrite(documentId, async () => {
+      if (mode !== "upsert") {
+        const exists = await this.store.documentExists(
+          documentId,
+          document.namespace,
+        );
+        if (mode === "create" && exists) throw new DocumentExistsError();
+        if (mode === "update" && !exists) throw new DocumentNotFoundError();
+      }
+      const prepared = await prepare();
+      const { chunks } = prepared;
+      const metadata = ingestSchema.shape.metadata.parse(prepared.metadata);
+      // Finish every embedding before touching existing Qdrant points.
+      const vectors = await this.embedder.embedDocuments(
+        chunks.map((chunk) => chunk.text),
+      );
+      if (vectors.length !== chunks.length)
+        throw new Error("Embedding count mismatch");
+      await this.store.replaceDocument(
+        documentId,
+        chunks.map((chunk, index) => ({
+          id: chunkId(documentId, index),
+          vector: vectors[index]!,
+          payload: {
+            ...chunk,
+            documentId,
+            namespace: document.namespace,
+            source: document.source,
+            metadata,
+            embeddingModel: this.embedder.model,
+          },
+        })),
+      );
+      return {
+        documentId,
+        source: document.source,
+        namespace: document.namespace,
+        chunks: chunks.length,
+        ...(prepared.pageCount !== undefined
+          ? { pageCount: prepared.pageCount, emptyPages: prepared.emptyPages }
+          : {}),
+      };
+    });
+  }
+
+  private async serializeWrite<T>(documentId: string, write: () => Promise<T>) {
     const previous = this.writes.get(documentId) ?? Promise.resolve();
-    const operation = previous
-      .catch(() => {})
-      .then(async () => {
-        const prepared = await prepare();
-        const { chunks } = prepared;
-        const metadata = ingestSchema.shape.metadata.parse(prepared.metadata);
-        // Finish every embedding before touching existing Qdrant points.
-        const vectors = await this.embedder.embedDocuments(
-          chunks.map((chunk) => chunk.text),
-        );
-        if (vectors.length !== chunks.length)
-          throw new Error("Embedding count mismatch");
-        await this.store.replaceDocument(
-          documentId,
-          chunks.map((chunk, index) => ({
-            id: chunkId(documentId, index),
-            vector: vectors[index]!,
-            payload: {
-              ...chunk,
-              documentId,
-              namespace: document.namespace,
-              source: document.source,
-              metadata,
-              embeddingModel: this.embedder.model,
-            },
-          })),
-        );
-        return {
-          documentId,
-          source: document.source,
-          namespace: document.namespace,
-          chunks: chunks.length,
-          ...(prepared.pageCount !== undefined
-            ? { pageCount: prepared.pageCount, emptyPages: prepared.emptyPages }
-            : {}),
-        };
-      });
+    const operation = previous.catch(() => {}).then(write);
     this.writes.set(documentId, operation);
     try {
       return await operation;

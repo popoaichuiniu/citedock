@@ -55,6 +55,27 @@ export const ingestSchema = z
   .strict();
 export type SearchInput = z.input<typeof searchSchema>;
 export type IngestInput = z.input<typeof ingestSchema>;
+export const documentTargetSchema = z
+  .object({
+    namespace: namespaceSchema
+      .unwrap()
+      .describe("Explicit knowledge base namespace containing the document"),
+    source: ingestSchema.shape.source.describe(
+      "Exact stable source identifier, as returned by rag_list_documents",
+    ),
+  })
+  .strict();
+export const documentWriteSchema = ingestSchema.extend({
+  ...documentTargetSchema.shape,
+  text: ingestSchema.shape.text.describe(
+    "Complete document text. Updates replace the entire document, not just a passage",
+  ),
+  metadata: ingestSchema.shape.metadata.describe(
+    "Metadata for the new document; omitted metadata becomes an empty object, including on updates",
+  ),
+});
+export type DocumentTargetInput = z.input<typeof documentTargetSchema>;
+export type DocumentWriteInput = z.input<typeof documentWriteSchema>;
 export const pdfUploadSchema = ingestSchema.omit({
   text: true,
   metadata: true,
@@ -120,6 +141,11 @@ export const chunkListSchema = z
   })
   .strict();
 export const documentIdSchema = z.string().regex(/^[a-f0-9]{64}$/);
+export const documentReadSchema = documentTargetSchema.extend({
+  limit: chunkListSchema.shape.limit,
+  after: chunkListSchema.shape.after,
+});
+export type DocumentReadInput = z.input<typeof documentReadSchema>;
 export type DocumentListInput = z.input<typeof documentListSchema>;
 export type ChunkListInput = z.input<typeof chunkListSchema>;
 export type DocumentSummary = {

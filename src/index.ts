@@ -1,6 +1,11 @@
-export { createRagService, RagService } from "./rag.js";
+export {
+  createRagService,
+  RagService,
+  DocumentExistsError,
+  DocumentNotFoundError,
+} from "./rag.js";
 export { loadConfig, parseConfig, type Config } from "./config.js";
-export { searchTool, executeTool } from "./tools.js";
+export { searchTool, ragTools, executeTool } from "./tools.js";
 export { createMcpServer } from "./mcp-server.js";
 export { extractPdf, PdfImportError, type PdfText } from "./pdf.js";
 export type {
@@ -15,4 +20,7 @@ export type {
   DocumentList,
   ChunkList,
   NamespaceList,
+  DocumentWriteInput,
+  DocumentTargetInput,
+  DocumentReadInput,
 } from "./schema.js";

@@ -5,7 +5,11 @@ import {
   type ServerResponse,
 } from "node:http";
 import { z } from "zod";
-import type { RagService } from "./rag.js";
+import {
+  DocumentExistsError,
+  DocumentNotFoundError,
+  type RagService,
+} from "./rag.js";
 import { PdfImportError } from "./pdf.js";
 import {
   ingestSchema,
@@ -16,13 +20,10 @@ import {
   chunkListSchema,
   documentIdSchema,
 } from "./schema.js";
-import { executeTool, searchTool } from "./tools.js";
+import { executeTool, ragTools, toolCallSchema } from "./tools.js";
 import { serveWebAsset } from "./web-assets.js";
 
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
-const toolCallSchema = z
-  .object({ name: z.literal("rag_search"), arguments: searchSchema })
-  .strict();
 class HttpError extends Error {
   constructor(
     readonly status: number,
@@ -120,7 +121,7 @@ export function createHttpServer(
       if (req.method === "GET" && path === "/readyz")
         return send(res, 200, await rag.health());
       if (req.method === "GET" && path === "/v1/tools")
-        return send(res, 200, { tools: [searchTool] });
+        return send(res, 200, { tools: ragTools });
       if (req.method === "GET" && path === "/v1/namespaces")
         return send(res, 200, await rag.listNamespaces());
       if (req.method === "GET" && path === "/v1/documents")
@@ -178,6 +179,10 @@ export function createHttpServer(
         return send(res, error.status, { error: error.message });
       if (error instanceof PdfImportError)
         return send(res, 400, { error: error.message });
+      if (error instanceof DocumentExistsError)
+        return send(res, 409, { error: error.message });
+      if (error instanceof DocumentNotFoundError)
+        return send(res, 404, { error: error.message });
       console.error(
         "RAG request failed:",
         error instanceof Error ? error.message : "Unknown dependency failure",

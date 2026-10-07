@@ -5,7 +5,7 @@ import { loadConfig } from "./config.js";
 import { documentFiles } from "./files.js";
 import { createRagService } from "./rag.js";
 import { MAX_PDF_BYTES } from "./schema.js";
-import { searchTool } from "./tools.js";
+import { ragTools } from "./tools.js";
 
 const usage = `Usage:
   npm run rag -- ingest <file-or-directory> [--namespace default] [--source source-id]
@@ -28,7 +28,7 @@ try {
   const [command, argument] = positionals;
   if (values.help || !command) console.log(usage);
   else if (command === "tools")
-    console.log(JSON.stringify({ tools: [searchTool] }, null, 2));
+    console.log(JSON.stringify({ tools: ragTools }, null, 2));
   else {
     const rag = createRagService(loadConfig());
     if (command === "ingest") {

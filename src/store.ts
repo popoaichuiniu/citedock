@@ -33,6 +33,8 @@ export type SearchOptions = {
 export interface VectorStore {
   ensureCollection(create: boolean, refresh?: boolean): Promise<boolean>;
   replaceDocument(documentId: string, points: VectorPoint[]): Promise<void>;
+  documentExists(documentId: string, namespace: string): Promise<boolean>;
+  deleteDocument(documentId: string, namespace: string): Promise<number>;
   search(vector: number[], options: SearchOptions): Promise<RetrievedPoint[]>;
   listDocuments(options: DocumentListOptions): Promise<DocumentList>;
   listChunks(documentId: string, options: ChunkListOptions): Promise<ChunkList>;
@@ -158,6 +160,39 @@ export class QdrantStore implements VectorStore {
         ],
       },
     });
+  }
+
+  async documentExists(documentId: string, namespace: string): Promise<boolean> {
+    if (!(await this.ensureCollection(false))) return false;
+    const { count } = await this.client.count(this.config.QDRANT_COLLECTION, {
+      exact: true,
+      filter: this.documentFilter(documentId, namespace),
+    });
+    return count > 0;
+  }
+
+  async deleteDocument(documentId: string, namespace: string): Promise<number> {
+    if (!(await this.ensureCollection(false))) return 0;
+    const filter = this.documentFilter(documentId, namespace);
+    const { count } = await this.client.count(this.config.QDRANT_COLLECTION, {
+      exact: true,
+      filter,
+    });
+    if (count > 0)
+      await this.client.delete(this.config.QDRANT_COLLECTION, {
+        wait: true,
+        filter,
+      });
+    return count;
+  }
+
+  private documentFilter(documentId: string, namespace: string) {
+    return {
+      must: [
+        { key: "namespace", match: { value: namespace } },
+        { key: "documentId", match: { value: documentId } },
+      ],
+    };
   }
 
   async search(

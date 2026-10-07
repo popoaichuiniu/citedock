@@ -2,12 +2,12 @@ import {
   createRagService,
   executeTool,
   loadConfig,
-  searchTool,
+  ragTools,
 } from "../src/index.js";
 
 // Example for a backend that receives tool_calls from an OpenAI-compatible chat model.
-// Send [searchTool] as the request's tools; dispatch only the returned tool call.
-export const tools = [searchTool];
+// Send ragTools as the request's tools; dispatch only the returned tool call.
+export const tools = ragTools;
 const rag = createRagService(loadConfig());
 export async function handleToolCall(call: {
   id: string;

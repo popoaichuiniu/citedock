@@ -200,3 +200,57 @@ test("a later batch failure skips tail cleanup and a retry finishes replacement"
     ],
   });
 });
+
+test("Qdrant document existence and deletion use exact namespace and document filters", async (t) => {
+  const store = new QdrantStore(config);
+  t.mock.method(store.client, "collectionExists", async () => ({
+    exists: true,
+  }));
+  t.mock.method(store.client, "getCollection", async () => collectionInfo());
+  const count = t.mock.method(store.client, "count", async () => ({
+    count: 3,
+  }));
+  const deletion = t.mock.method(store.client, "delete", async () => ({}));
+  assert.equal(await store.documentExists("document", "private"), true);
+  assert.equal(await store.deleteDocument("document", "private"), 3);
+  const filter = {
+    must: [
+      { key: "namespace", match: { value: "private" } },
+      { key: "documentId", match: { value: "document" } },
+    ],
+  };
+  assert.deepEqual(count.mock.calls[0]!.arguments[1], { exact: true, filter });
+  assert.deepEqual(deletion.mock.calls[0]!.arguments[1], {
+    wait: true,
+    filter,
+  });
+});
+
+test("deletion never creates a missing collection or reports success after a dependency failure", async (t) => {
+  const store = new QdrantStore(config);
+  const existence = t.mock.method(
+    store.client,
+    "collectionExists",
+    async () => ({ exists: false }),
+  );
+  const create = t.mock.method(store.client, "createCollection");
+  const deletion = t.mock.method(store.client, "delete", async () => {
+    throw new Error("delete unavailable");
+  });
+  assert.equal(await store.deleteDocument("document", "default"), 0);
+  assert.equal(await store.documentExists("document", "default"), false);
+  assert.equal(create.mock.callCount(), 0);
+  assert.equal(deletion.mock.callCount(), 0);
+  existence.mock.mockImplementation(async () => ({ exists: true }));
+  t.mock.method(store.client, "getCollection", async () => collectionInfo());
+  const count = t.mock.method(store.client, "count", async () => ({
+    count: 0,
+  }));
+  assert.equal(await store.deleteDocument("document", "default"), 0);
+  assert.equal(deletion.mock.callCount(), 0);
+  count.mock.mockImplementation(async () => ({ count: 2 }));
+  await assert.rejects(
+    store.deleteDocument("document", "default"),
+    /delete unavailable/,
+  );
+});

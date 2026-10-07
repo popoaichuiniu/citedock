@@ -291,6 +291,8 @@ test(
         EMBEDDING_BASE_URL: config.EMBEDDING_BASE_URL,
         EMBEDDING_API_KEY: config.EMBEDDING_API_KEY,
         EMBEDDING_DIMENSIONS: String(config.EMBEDDING_DIMENSIONS),
+        CHUNK_SIZE: String(config.CHUNK_SIZE),
+        CHUNK_OVERLAP: String(config.CHUNK_OVERLAP),
       },
     });
     t.after(() => client.close());
@@ -326,6 +328,80 @@ test(
       (pdfCall.structuredContent as { matches: { page: number }[] }).matches[0]
         ?.page,
       3,
+    );
+    const target = { namespace: "model-writes", source: "generated.md" };
+    const added = await client.callTool({
+      name: "rag_add_document",
+      arguments: {
+        ...target,
+        text: "模型写入的知识库文档。".repeat(20),
+        metadata: { category: "generated" },
+      },
+    });
+    assert.ok(!added.isError);
+    assert.ok((added.structuredContent as { chunks: number }).chunks > 1);
+    const duplicate = await client.callTool({
+      name: "rag_add_document",
+      arguments: { ...target, text: "误覆盖" },
+    });
+    assert.equal(duplicate.isError, true);
+    const read = await client.callTool({
+      name: "rag_get_document",
+      arguments: { ...target, limit: 1 },
+    });
+    assert.ok(
+      (read.structuredContent as { nextAfter: number | null }).nextAfter !==
+        null,
+    );
+    const changed = await client.callTool({
+      name: "rag_update_document",
+      arguments: { ...target, text: "新的知识：Qdrant 持久化保存向量。" },
+    });
+    assert.ok(!changed.isError);
+    assert.equal((changed.structuredContent as { chunks: number }).chunks, 1);
+    const postTool = (name: string, args: unknown) =>
+      fetch(`${baseUrl}/v1/tools/call`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, arguments: args }),
+      });
+    const realRead = await postTool("rag_get_document", target);
+    const realDocument = (await realRead.json()) as ChunkList;
+    assert.equal(realDocument.total, 1);
+    assert.equal(
+      realDocument.chunks[0]!.text,
+      "新的知识：Qdrant 持久化保存向量。",
+    );
+    const protectedTarget = { ...target, namespace: "other-model-writes" };
+    assert.equal(
+      (
+        await postTool("rag_add_document", {
+          ...protectedTarget,
+          text: "另一知识库的文档",
+        })
+      ).status,
+      200,
+    );
+    const deleted = await client.callTool({
+      name: "rag_delete_document",
+      arguments: target,
+    });
+    assert.equal(
+      (deleted.structuredContent as { deletedChunks: number }).deletedChunks,
+      1,
+    );
+    assert.equal(
+      (await rag.search({ ...target, query: "持久化保存向量" })).matches.length,
+      0,
+    );
+    assert.equal(
+      (await postTool("rag_get_document", protectedTarget)).status,
+      200,
+    );
+    assert.equal((await postTool("rag_get_document", target)).status, 404);
+    assert.equal(
+      (await postTool("rag_delete_document", protectedTarget)).status,
+      200,
     );
     console.log(
       `Live semantic retrieval passed: ${found.matches[0]!.source}, cosine=${found.matches[0]!.score.toFixed(4)}; PDF CLI/HTTP import and page 3 citations passed; stdio MCP passed from another cwd.`,
