@@ -15,6 +15,7 @@
         "${input:ragNamespace}"
       ],
       "cwd": "${workspaceFolder}",
+      "env": { "QDRANT_KEEP_ALIVE": "false" },
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "sourceMaps": true,
@@ -38,6 +39,7 @@
         "5"
       ],
       "cwd": "${workspaceFolder}",
+      "env": { "QDRANT_KEEP_ALIVE": "false" },
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "sourceMaps": true,

@@ -4,6 +4,28 @@ import { parseConfig } from "../src/config.js";
 import { QdrantStore, type VectorPoint } from "../src/store.js";
 
 const config = parseConfig({ EMBEDDING_DIMENSIONS: "2" });
+test("Qdrant debug requests close connections while normal requests retain pooling", async (t) => {
+  const fetch = t.mock.method(globalThis, "fetch", async () =>
+    Response.json({ result: { exists: true }, status: "ok", time: 0 }),
+  );
+  for (const [env, connection] of [
+    [{}, null],
+    [{ QDRANT_KEEP_ALIVE: "false" }, "close"],
+  ] as const) {
+    const store = new QdrantStore(
+      parseConfig({
+        QDRANT_URL: "https://qdrant.example",
+        QDRANT_API_KEY: "test-key",
+        ...env,
+      }),
+    );
+    await store.client.collectionExists(config.QDRANT_COLLECTION);
+    const headers = new Headers(fetch.mock.calls.at(-1)!.arguments[1]?.headers);
+    assert.equal(headers.get("connection"), connection);
+    assert.equal(headers.get("api-key"), "test-key");
+  }
+});
+
 function collectionInfo(overrides: Record<string, unknown> = {}) {
   return {
     config: {

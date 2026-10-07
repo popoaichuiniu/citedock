@@ -36,6 +36,10 @@ const envSchema = z
       .regex(/^[\w-]+$/)
       .default("rag_qwen3_8b_mlx"),
     QDRANT_TIMEOUT_MS: positiveInt.default(30000),
+    QDRANT_KEEP_ALIVE: z
+      .enum(["true", "false"])
+      .default("true")
+      .transform((value) => value === "true"),
     CHUNK_SIZE: positiveInt.min(32).max(16000).default(1200),
     CHUNK_OVERLAP: z.coerce.number().int().nonnegative().default(150),
     HTTP_HOST: z.string().min(1).default("127.0.0.1"),

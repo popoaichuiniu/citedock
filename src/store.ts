@@ -48,6 +48,10 @@ export class QdrantStore implements VectorStore {
       ...(config.QDRANT_API_KEY ? { apiKey: config.QDRANT_API_KEY } : {}),
       timeout: config.QDRANT_TIMEOUT_MS,
       checkCompatibility: false,
+      // Debugger pauses can leave an idle pooled connection closed by Qdrant.
+      ...(!config.QDRANT_KEEP_ALIVE
+        ? { headers: { Connection: "close" } }
+        : {}),
     });
   }
 

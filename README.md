@@ -90,6 +90,8 @@ npm run rag -- ingest ./docs/manual.pdf --namespace product
 npm run rag -- search "如何配置？" --namespace product --top-k 5 --min-score 0.4
 ```
 
+VS Code 中可选择“RAG：导入资料”或“RAG：检索资料”调试。配置通过 `tsx` 直接运行 `src/cli.ts`，默认知识库为 `default`；导入与检索须使用相同名称。调试启动时设置 `QDRANT_KEEP_ALIVE=false`，每次 Qdrant 请求结束后关闭连接，避免长时间停在断点后复用已经失效的空闲连接而报 `ECONNRESET`。普通运行默认复用连接；命令行需要同样的调试行为时，也可设置该环境变量。
+
 同一个 `namespace + source` 唯一标识一份文档。重复导入会覆盖已有分块并清理多余旧分块；所有向量计算成功之后才开始写库。不同 namespace 互不覆盖。单文件正文最多 2,000,000 个 UTF-16 单元；分块大小按 Unicode 字符计数，默认 1200 字符、重叠 150 字符，并优先在段落或句末切分。
 
 文本文件返回的行号对应原始文本，CRLF/CR 统一为 LF。目录导入跳过隐藏文件、符号链接、node_modules、dist 和 storage。支持 UTF-8 纯文本和带文字层的 PDF；DOCX 需要先提取正文。
