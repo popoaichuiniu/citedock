@@ -11,6 +11,11 @@ import {
   type SearchInput,
   type SearchResult,
   type PdfIngestInput,
+  documentListSchema,
+  chunkListSchema,
+  documentIdSchema,
+  type DocumentListInput,
+  type ChunkListInput,
 } from "./schema.js";
 import { QdrantStore, type VectorStore } from "./store.js";
 
@@ -177,6 +182,21 @@ export class RagService {
       model: this.embedder.model,
       dimensions: this.embedder.dimensions,
     };
+  }
+
+  async listDocuments(input: DocumentListInput = {}) {
+    return this.store.listDocuments(documentListSchema.parse(input));
+  }
+
+  async listNamespaces() {
+    return this.store.listNamespaces();
+  }
+
+  async listChunks(documentId: string, input: ChunkListInput = {}) {
+    return this.store.listChunks(
+      documentIdSchema.parse(documentId),
+      chunkListSchema.parse(input),
+    );
   }
 }
 

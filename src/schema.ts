@@ -99,3 +99,52 @@ export type SearchResult = {
   context: string;
   truncated: boolean;
 };
+
+export const documentListSchema = z
+  .object({
+    namespace: namespaceSchema,
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+    cursor: z.string().uuid().optional(),
+  })
+  .strict();
+export const chunkListSchema = z
+  .object({
+    namespace: namespaceSchema,
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+    after: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(Number.MAX_SAFE_INTEGER)
+      .default(0),
+  })
+  .strict();
+export const documentIdSchema = z.string().regex(/^[a-f0-9]{64}$/);
+export type DocumentListInput = z.input<typeof documentListSchema>;
+export type ChunkListInput = z.input<typeof chunkListSchema>;
+export type DocumentSummary = {
+  documentId: string;
+  source: string;
+  namespace: string;
+  chunks: number;
+  pageCount?: number;
+  preview: string;
+};
+export type DocumentList = {
+  namespace: string;
+  documents: DocumentSummary[];
+  totalDocuments: number;
+  totalChunks: number;
+  nextCursor: string | null;
+};
+export type ChunkList = {
+  namespace: string;
+  documentId: string;
+  chunks: (StoredChunk & { id: string })[];
+  total: number;
+  nextAfter: number | null;
+};
+export type NamespaceList = {
+  namespaces: { namespace: string; chunks: number }[];
+  truncated: boolean;
+};

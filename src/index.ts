@@ -9,4 +9,10 @@ export type {
   SearchInput,
   SearchHit,
   SearchResult,
+  DocumentListInput,
+  ChunkListInput,
+  DocumentSummary,
+  DocumentList,
+  ChunkList,
+  NamespaceList,
 } from "./schema.js";

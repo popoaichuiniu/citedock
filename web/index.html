@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>知识库 · RAG 后台</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23354fd7'/%3E%3Cpath d='M9 8h14v16H9zM13 12h6M13 16h6M13 20h4' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script type="module" src="/assets/app.js"></script>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="知识库首页"
+        ><span class="brand-icon">知</span
+        ><span>知识库<small>RAG 管理后台</small></span></a
+      >
+      <div class="nav-label">工作空间</div>
+      <nav aria-label="主导航">
+        <button class="nav-item active" data-view="library" aria-current="page">
+          <span aria-hidden="true">▤</span>已存资料
+        </button>
+        <button class="nav-item" data-view="import">
+          <span aria-hidden="true">＋</span>导入文件
+        </button>
+        <button class="nav-item" data-view="search">
+          <span aria-hidden="true">⌕</span>检索资料
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="local-dot"></span> 本机知识库<small
+          >资料保存于本机 Qdrant</small
+        ><button id="settings-button" class="text-button" type="button">
+          连接设置
+        </button>
+      </div>
+    </aside>
+    <main>
+      <header class="topbar">
+        <div class="breadcrumb">
+          工作空间 <span>/</span> <b id="breadcrumb-current">已存资料</b>
+        </div>
+        <button
+          id="mobile-settings-button"
+          class="icon-button mobile-settings"
+          type="button"
+          aria-label="连接设置"
+        >
+          ⚙
+        </button>
+        <button
+          id="health-button"
+          class="health"
+          data-state="checking"
+          type="button"
+          title="点击重新检查服务"
+        >
+          <span class="status-dot"></span
+          ><span id="health-label">正在检查服务</span>
+        </button>
+      </header>
+      <div class="workspace">
+        <div class="page-heading">
+          <div>
+            <div class="eyebrow">YOUR KNOWLEDGE, ORGANIZED</div>
+            <h1 id="page-title">已存资料</h1>
+            <p id="page-subtitle">看看知识库里有什么，以及它们如何被保存。</p>
+          </div>
+          <form id="namespace-form" class="namespace-control">
+            <label for="namespace">当前知识库</label>
+            <div>
+              <input
+                id="namespace"
+                list="namespace-options"
+                value="default"
+                maxlength="128"
+                required
+                autocomplete="off"
+                aria-describedby="namespace-hint"
+              /><datalist id="namespace-options">
+                <option value="default"></option></datalist
+              ><button class="button subtle small" type="submit">切换</button>
+            </div>
+            <span id="namespace-hint">可选择已有知识库，或输入新名称</span>
+          </form>
+        </div>
+        <p id="global-notice" class="notice" role="status" hidden></p>
+        <section id="view-library" class="view" aria-label="已存资料">
+          <div class="stats">
+            <article class="stat">
+              <span>已存文件</span><strong id="document-count">—</strong
+              ><small>当前知识库中的资料</small>
+            </article>
+            <article class="stat">
+              <span>文本分块</span><strong id="chunk-count">—</strong
+              ><small>数据库中实际存储的片段</small>
+            </article>
+            <article class="stat stat-action">
+              <div>
+                <span>让资料变得可检索</span>
+                <p>上传文件，开始积累知识。</p>
+              </div>
+              <button class="button primary" data-view="import">
+                ＋ 导入文件
+              </button>
+            </article>
+          </div>
+          <div class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>文件列表</h2>
+                <p>点击文件，查看保存的正文分块。</p>
+              </div>
+              <button
+                id="refresh-button"
+                class="button subtle small"
+                type="button"
+              >
+                ↻ 刷新
+              </button>
+            </div>
+            <div id="library-status" class="empty-state" role="status">
+              正在读取数据库…
+            </div>
+            <div id="document-list" class="document-list"></div>
+            <div class="pagination" id="document-pagination" hidden>
+              <span id="document-page-label"></span>
+              <div>
+                <button
+                  id="documents-prev"
+                  class="button subtle small"
+                  type="button"
+                >
+                  上一页</button
+                ><button
+                  id="documents-next"
+                  class="button subtle small"
+                  type="button"
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
+          </div>
+          <p class="footnote">
+            这里只展示已保存的资料。检索时，系统会从这些分块中寻找相关原文。
+          </p>
+        </section>
+        <section id="view-import" class="view" aria-label="导入文件" hidden>
+          <div class="import-grid">
+            <div class="panel import-panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>选择你的资料</h2>
+                  <p>支持一次选择多个文件，也可以拖放到下方。</p>
+                </div>
+              </div>
+              <label id="dropzone" class="dropzone" for="file-input"
+                ><span class="upload-icon" aria-hidden="true">↑</span
+                ><strong>点击选择文件，或拖放文件到这里</strong
+                ><span>PDF · Markdown · TXT</span
+                ><span class="choose-file">选择文件</span
+                ><input
+                  id="file-input"
+                  type="file"
+                  multiple
+                  accept=".pdf,.md,.markdown,.txt"
+              /></label>
+              <div class="import-toolbar">
+                <span id="selection-label">尚未选择文件</span
+                ><button
+                  id="import-button"
+                  class="button primary"
+                  type="button"
+                  disabled
+                >
+                  开始导入
+                </button>
+              </div>
+              <ul
+                id="import-list"
+                class="import-list"
+                aria-label="导入队列"
+              ></ul>
+              <p id="import-status" class="notice" role="status" hidden></p>
+            </div>
+            <aside class="panel import-tips">
+              <span class="tip-tag">导入小贴士</span>
+              <h2>从文件到知识</h2>
+              <ol>
+                <li>
+                  <strong>选择资料</strong
+                  ><span>文本 PDF、Markdown 或 UTF-8 TXT。</span>
+                </li>
+                <li>
+                  <strong>点击开始导入</strong
+                  ><span>系统提取正文、分块，再保存到数据库。</span>
+                </li>
+                <li>
+                  <strong>用自然语言检索</strong
+                  ><span>输入问题，找到相关原文和来源。</span>
+                </li>
+              </ol>
+              <div class="tip-note">
+                PDF 最大 32 MiB，文本文件最大 8 MiB。扫描件不支持导入。<br /><br />同一知识库中的同名文件再次导入，会更新已有内容。
+              </div>
+            </aside>
+          </div>
+        </section>
+        <section id="view-search" class="view" aria-label="检索资料" hidden>
+          <form id="search-form" class="panel search-panel">
+            <label for="query" class="search-label">你想查找什么？</label
+            ><textarea
+              id="query"
+              placeholder="例如：PDF 导入如何保留原始页码？"
+              maxlength="8000"
+              rows="3"
+              required
+            ></textarea>
+            <div class="search-toolbar">
+              <label class="result-limit" for="top-k"
+                >最多返回
+                <select id="top-k">
+                  <option value="3">3</option>
+                  <option value="5" selected>5</option>
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                </select>
+                个片段</label
+              ><button id="search-button" class="button primary" type="submit">
+                检索资料 <span aria-hidden="true">↗</span>
+              </button>
+            </div>
+          </form>
+          <div class="results-heading">
+            <div>
+              <h2>检索结果</h2>
+              <p id="search-summary">结果将展示相关原文、文件来源和位置。</p>
+            </div>
+            <button
+              id="copy-context"
+              class="button subtle small"
+              type="button"
+              hidden
+            >
+              复制引用文本
+            </button>
+          </div>
+          <div id="search-status" class="panel empty-state" role="status">
+            <span class="empty-symbol" aria-hidden="true">⌕</span
+            ><strong>从一个问题开始</strong
+            ><span>导入资料后，在上方输入你想查找的内容。</span>
+          </div>
+          <div id="search-results" class="search-results"></div>
+          <p class="footnote">
+            显示的是数据库中的相关原文。相关度表示向量相似程度，不是答案正确率。
+          </p>
+        </section>
+      </div>
+    </main>
+    <dialog id="document-dialog" class="document-dialog">
+      <div class="dialog-header">
+        <div>
+          <div class="eyebrow">STORED CONTENT</div>
+          <h2 id="detail-title">文件分块</h2>
+          <p id="detail-summary"></p>
+        </div>
+        <button
+          id="close-document"
+          class="icon-button"
+          type="button"
+          aria-label="关闭文件详情"
+        >
+          ×
+        </button>
+      </div>
+      <div class="dialog-body">
+        <p id="detail-status" class="notice" role="status" hidden></p>
+        <div id="detail-chunks" class="detail-chunks"></div>
+        <button id="chunks-more" class="button subtle" type="button" hidden>
+          加载更多分块
+        </button>
+      </div>
+    </dialog>
+    <dialog id="settings-dialog" class="settings-dialog">
+      <form id="settings-form">
+        <div class="dialog-header">
+          <h2>连接设置</h2>
+          <button
+            id="close-settings"
+            class="icon-button"
+            type="button"
+            aria-label="关闭连接设置"
+          >
+            ×
+          </button>
+        </div>
+        <p>服务设置了访问密钥时，请在这里填写。</p>
+        <label for="api-key">访问密钥</label
+        ><input
+          id="api-key"
+          type="password"
+          autocomplete="off"
+          placeholder="未设置时留空"
+        /><small>密钥仅在当前页面内存中使用，刷新后需要重新填写。</small
+        ><button class="button primary" type="submit">连接服务</button>
+      </form>
+    </dialog>
+    <noscript><p>请启用 JavaScript，以便导入和检索资料。</p></noscript>
+  </body>
+</html>

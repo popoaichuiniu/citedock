@@ -12,8 +12,12 @@ import {
   searchSchema,
   pdfUploadSchema,
   MAX_PDF_BYTES,
+  documentListSchema,
+  chunkListSchema,
+  documentIdSchema,
 } from "./schema.js";
 import { executeTool, searchTool } from "./tools.js";
+import { serveWebAsset } from "./web-assets.js";
 
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
 const toolCallSchema = z
@@ -106,6 +110,7 @@ export function createHttpServer(
     void (async () => {
       const url = new URL(req.url ?? "/", "http://localhost");
       const path = url.pathname;
+      if (req.method === "GET" && (await serveWebAsset(path, res))) return;
       if (req.method === "GET" && path === "/healthz")
         return send(res, 200, { status: "ok" });
       if (!authorized(req.headers.authorization, options.apiKey ?? "")) {
@@ -116,6 +121,26 @@ export function createHttpServer(
         return send(res, 200, await rag.health());
       if (req.method === "GET" && path === "/v1/tools")
         return send(res, 200, { tools: [searchTool] });
+      if (req.method === "GET" && path === "/v1/namespaces")
+        return send(res, 200, await rag.listNamespaces());
+      if (req.method === "GET" && path === "/v1/documents")
+        return send(
+          res,
+          200,
+          await rag.listDocuments(
+            validate(documentListSchema, Object.fromEntries(url.searchParams)),
+          ),
+        );
+      const chunksRoute = /^\/v1\/documents\/([^/]+)\/chunks$/.exec(path);
+      if (req.method === "GET" && chunksRoute)
+        return send(
+          res,
+          200,
+          await rag.listChunks(
+            validate(documentIdSchema, chunksRoute[1]),
+            validate(chunkListSchema, Object.fromEntries(url.searchParams)),
+          ),
+        );
       if (req.method === "POST" && path === "/v1/search")
         return send(
           res,

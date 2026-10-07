@@ -1,6 +1,18 @@
 import { QdrantClient, type Schemas } from "@qdrant/js-client-rest";
 import type { Config } from "./config.js";
-import { storedChunkSchema, type StoredChunk } from "./schema.js";
+import {
+  storedChunkSchema,
+  type StoredChunk,
+  type DocumentList,
+  type ChunkList,
+  type NamespaceList,
+  type documentListSchema,
+  type chunkListSchema,
+} from "./schema.js";
+import type { z } from "zod";
+
+export type DocumentListOptions = z.output<typeof documentListSchema>;
+export type ChunkListOptions = z.output<typeof chunkListSchema>;
 
 export type VectorPoint = {
   id: string;
@@ -22,6 +34,9 @@ export interface VectorStore {
   ensureCollection(create: boolean, refresh?: boolean): Promise<boolean>;
   replaceDocument(documentId: string, points: VectorPoint[]): Promise<void>;
   search(vector: number[], options: SearchOptions): Promise<RetrievedPoint[]>;
+  listDocuments(options: DocumentListOptions): Promise<DocumentList>;
+  listChunks(documentId: string, options: ChunkListOptions): Promise<ChunkList>;
+  listNamespaces(): Promise<NamespaceList>;
 }
 
 export class QdrantStore implements VectorStore {
@@ -166,5 +181,129 @@ export class QdrantStore implements VectorStore {
       score: point.score,
       payload: storedChunkSchema.parse(point.payload),
     }));
+  }
+
+  async listDocuments(options: DocumentListOptions): Promise<DocumentList> {
+    const empty: DocumentList = {
+      namespace: options.namespace,
+      documents: [],
+      totalDocuments: 0,
+      totalChunks: 0,
+      nextCursor: null,
+    };
+    if (!(await this.ensureCollection(false))) return empty;
+    const collection = this.config.QDRANT_COLLECTION;
+    const namespace = { key: "namespace", match: { value: options.namespace } };
+    const filter = {
+      must: [namespace, { key: "chunkIndex", match: { value: 0 } }],
+    };
+    const [page, documents, chunks] = await Promise.all([
+      this.client.scroll(collection, {
+        filter,
+        limit: options.limit,
+        ...(options.cursor ? { offset: options.cursor } : {}),
+        with_payload: true,
+        with_vector: false,
+      }),
+      this.client.count(collection, { filter, exact: true }),
+      this.client.count(collection, {
+        filter: { must: [namespace] },
+        exact: true,
+      }),
+    ]);
+    const summaries = await Promise.all(
+      page.points.map(async (point) => {
+        const payload = storedChunkSchema.parse(point.payload);
+        const { count } = await this.client.count(collection, {
+          filter: {
+            must: [
+              namespace,
+              { key: "documentId", match: { value: payload.documentId } },
+            ],
+          },
+          exact: true,
+        });
+        const pageCount = payload.metadata.pageCount;
+        return {
+          documentId: payload.documentId,
+          source: payload.source,
+          namespace: payload.namespace,
+          chunks: count,
+          ...(typeof pageCount === "number" ? { pageCount } : {}),
+          preview: Array.from(payload.text).slice(0, 180).join(""),
+        };
+      }),
+    );
+    return {
+      ...empty,
+      documents: summaries,
+      totalDocuments: documents.count,
+      totalChunks: chunks.count,
+      nextCursor:
+        page.next_page_offset == null ? null : String(page.next_page_offset),
+    };
+  }
+
+  async listNamespaces(): Promise<NamespaceList> {
+    if (!(await this.ensureCollection(false)))
+      return { namespaces: [], truncated: false };
+    const result = await this.client.facet(this.config.QDRANT_COLLECTION, {
+      key: "namespace",
+      limit: 1001,
+      exact: true,
+    });
+    return {
+      namespaces: result.hits
+        .slice(0, 1000)
+        .map((hit) => ({ namespace: String(hit.value), chunks: hit.count }))
+        .sort((a, b) => a.namespace.localeCompare(b.namespace)),
+      truncated: result.hits.length > 1000,
+    };
+  }
+
+  async listChunks(
+    documentId: string,
+    options: ChunkListOptions,
+  ): Promise<ChunkList> {
+    const empty: ChunkList = {
+      namespace: options.namespace,
+      documentId,
+      chunks: [],
+      total: 0,
+      nextAfter: null,
+    };
+    if (!(await this.ensureCollection(false))) return empty;
+    const collection = this.config.QDRANT_COLLECTION;
+    const must = [
+      { key: "namespace", match: { value: options.namespace } },
+      { key: "documentId", match: { value: documentId } },
+    ];
+    const [page, count] = await Promise.all([
+      this.client.scroll(collection, {
+        filter: {
+          must: [...must, { key: "chunkIndex", range: { gte: options.after } }],
+        },
+        order_by: { key: "chunkIndex", direction: "asc" },
+        limit: options.limit + 1,
+        with_payload: true,
+        with_vector: false,
+      }),
+      this.client.count(collection, { filter: { must }, exact: true }),
+    ]);
+    const chunks = page.points
+      .slice(0, options.limit)
+      .map((point) => ({
+        ...storedChunkSchema.parse(point.payload),
+        id: String(point.id),
+      }));
+    return {
+      ...empty,
+      chunks,
+      total: count.count,
+      nextAfter:
+        page.points.length > options.limit
+          ? chunks.at(-1)!.chunkIndex + 1
+          : null,
+    };
   }
 }

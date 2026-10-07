@@ -9,6 +9,8 @@ import type {
   SearchOptions,
   VectorPoint,
   VectorStore,
+  DocumentListOptions,
+  ChunkListOptions,
 } from "../src/store.js";
 
 export async function listen(server: Server): Promise<string> {
@@ -44,6 +46,73 @@ export class MemoryStore implements VectorStore {
       )
       .slice(0, options.topK)
       .map((point) => ({ id: point.id, payload: point.payload, score: 0.9 }));
+  }
+  async listNamespaces() {
+    const counts = new Map<string, number>();
+    for (const point of this.points.values())
+      counts.set(
+        point.payload.namespace,
+        (counts.get(point.payload.namespace) ?? 0) + 1,
+      );
+    return {
+      namespaces: [...counts].map(([namespace, chunks]) => ({
+        namespace,
+        chunks,
+      })),
+      truncated: false,
+    };
+  }
+  async listDocuments(options: DocumentListOptions) {
+    const points = [...this.points.values()].filter(
+      (point) => point.payload.namespace === options.namespace,
+    );
+    const first = points
+      .filter((point) => point.payload.chunkIndex === 0)
+      .sort((a, b) => a.id.localeCompare(b.id));
+    const page = first
+      .filter((point) => !options.cursor || point.id >= options.cursor)
+      .slice(0, options.limit + 1);
+    return {
+      namespace: options.namespace,
+      totalChunks: points.length,
+      totalDocuments: first.length,
+      nextCursor: page[options.limit]?.id ?? null,
+      documents: page.slice(0, options.limit).map(({ payload }) => ({
+        documentId: payload.documentId,
+        source: payload.source,
+        namespace: payload.namespace,
+        chunks: points.filter(
+          (point) => point.payload.documentId === payload.documentId,
+        ).length,
+        preview: payload.text.slice(0, 180),
+        ...(typeof payload.metadata.pageCount === "number"
+          ? { pageCount: payload.metadata.pageCount }
+          : {}),
+      })),
+    };
+  }
+  async listChunks(documentId: string, options: ChunkListOptions) {
+    const points = [...this.points.values()]
+      .filter(
+        (point) =>
+          point.payload.namespace === options.namespace &&
+          point.payload.documentId === documentId,
+      )
+      .sort((a, b) => a.payload.chunkIndex - b.payload.chunkIndex);
+    const page = points
+      .filter((point) => point.payload.chunkIndex >= options.after)
+      .slice(0, options.limit + 1);
+    const chunks = page
+      .slice(0, options.limit)
+      .map((point) => ({ ...point.payload, id: point.id }));
+    return {
+      namespace: options.namespace,
+      documentId,
+      total: points.length,
+      chunks,
+      nextAfter:
+        page.length > options.limit ? chunks.at(-1)!.chunkIndex + 1 : null,
+    };
   }
 }
 export function fixture() {

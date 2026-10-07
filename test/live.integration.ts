@@ -17,6 +17,7 @@ import { createRagService } from "../src/rag.js";
 import { QdrantStore } from "../src/store.js";
 import { createHttpServer } from "../src/http-server.js";
 import { close, listen } from "./helpers.js";
+import type { ChunkList, DocumentList } from "../src/schema.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -31,6 +32,8 @@ test(
       CHUNK_OVERLAP: 16,
     };
     const rag = createRagService(config);
+    assert.equal((await rag.listDocuments()).totalDocuments, 0);
+    assert.deepEqual((await rag.listNamespaces()).namespaces, []);
     const embedder = new QwenEmbedder(config);
     const shortText = "香蕉是一种水果。";
     const single = (await embedder.embedDocuments([shortText]))[0]!;
@@ -86,6 +89,42 @@ test(
       text: "Qdrant 保存向量，并检索相关文档。".repeat(30),
     });
     assert.ok(long.chunks > 1);
+    const documents = await rag.listDocuments({ limit: 1 });
+    assert.equal(documents.totalDocuments, 3);
+    const seen = new Set(documents.documents.map((doc) => doc.documentId));
+    let cursor = documents.nextCursor;
+    while (cursor) {
+      const page: DocumentList = await rag.listDocuments({ limit: 1, cursor });
+      for (const document of page.documents) {
+        assert.ok(!seen.has(document.documentId));
+        seen.add(document.documentId);
+      }
+      cursor = page.nextCursor;
+    }
+    assert.equal(seen.size, 3);
+    const chunkIndexes: number[] = [];
+    let after: number | null = 0;
+    while (after !== null) {
+      const page: ChunkList = await rag.listChunks(long.documentId, {
+        limit: 2,
+        after,
+      });
+      assert.equal(page.total, long.chunks);
+      chunkIndexes.push(...page.chunks.map((chunk) => chunk.chunkIndex));
+      after = page.nextAfter;
+    }
+    assert.deepEqual(
+      chunkIndexes,
+      Array.from({ length: long.chunks }, (_, index) => index),
+    );
+    assert.equal(
+      (await rag.listChunks(long.documentId, { namespace: "private" })).total,
+      0,
+    );
+    assert.deepEqual(
+      (await rag.listNamespaces()).namespaces.map((item) => item.namespace),
+      ["default", "private"],
+    );
     const before = await store.client.count(config.QDRANT_COLLECTION, {
       exact: true,
     });
@@ -195,6 +234,22 @@ test(
     assert.equal(
       ((await httpImported.json()) as { pageCount: number }).pageCount,
       3,
+    );
+    const listedResponse = await fetch(
+      `${baseUrl}/v1/documents?namespace=pdf-http`,
+    );
+    assert.equal(listedResponse.status, 200);
+    const listed = (await listedResponse.json()) as DocumentList;
+    assert.equal(listed.totalDocuments, 1);
+    assert.equal(listed.documents[0]!.pageCount, 3);
+    const browsedResponse = await fetch(
+      `${baseUrl}/v1/documents/${listed.documents[0]!.documentId}/chunks?namespace=pdf-http`,
+    );
+    assert.equal(browsedResponse.status, 200);
+    const browsed = (await browsedResponse.json()) as ChunkList;
+    assert.deepEqual(
+      [...new Set(browsed.chunks.map((chunk) => chunk.page))],
+      [1, 3],
     );
     const httpFound = await fetch(`${baseUrl}/v1/tools/call`, {
       method: "POST",
