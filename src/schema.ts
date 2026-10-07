@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export const MAX_PDF_BYTES = 32 * 1024 * 1024;
+export const MAX_TEXT_CHARS = 2_000_000;
+
 export const namespaceSchema = z
   .string()
   .trim()
@@ -34,7 +37,7 @@ export const ingestSchema = z
     text: z
       .string()
       .min(1)
-      .max(2_000_000)
+      .max(MAX_TEXT_CHARS)
       .refine((value) => value.trim().length > 0, "Text must not be blank"),
     source: z.string().trim().min(1).max(2048),
     namespace: namespaceSchema,
@@ -52,6 +55,22 @@ export const ingestSchema = z
   .strict();
 export type SearchInput = z.input<typeof searchSchema>;
 export type IngestInput = z.input<typeof ingestSchema>;
+export const pdfUploadSchema = ingestSchema.omit({
+  text: true,
+  metadata: true,
+});
+export const pdfIngestSchema = ingestSchema.omit({ text: true }).extend({
+  data: z
+    .custom<Uint8Array>(
+      (value) => value instanceof Uint8Array,
+      "PDF data must be a Uint8Array",
+    )
+    .refine(
+      (data) => data.byteLength > 0 && data.byteLength <= MAX_PDF_BYTES,
+      "PDF must contain 1 byte to 32 MiB",
+    ),
+});
+export type PdfIngestInput = z.input<typeof pdfIngestSchema>;
 export const storedChunkSchema = z.object({
   documentId: z.string(),
   namespace: z.string(),
@@ -60,6 +79,7 @@ export const storedChunkSchema = z.object({
   chunkIndex: z.number().int(),
   startLine: z.number().int(),
   endLine: z.number().int(),
+  page: z.number().int().positive().optional(),
   metadata: z.record(
     z.string(),
     z.union([z.string(), z.number(), z.boolean(), z.null()]),

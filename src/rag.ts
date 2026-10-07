@@ -1,15 +1,30 @@
 import { createHash } from "node:crypto";
-import { chunkText } from "./chunker.js";
+import { chunkText, type Chunk } from "./chunker.js";
 import type { Config } from "./config.js";
 import { QwenEmbedder, type Embedder } from "./embedding.js";
+import { extractPdf } from "./pdf.js";
 import {
   ingestSchema,
+  pdfIngestSchema,
   searchSchema,
   type IngestInput,
   type SearchInput,
   type SearchResult,
+  type PdfIngestInput,
 } from "./schema.js";
 import { QdrantStore, type VectorStore } from "./store.js";
+
+type DocumentInfo = {
+  namespace: string;
+  source: string;
+  metadata: Record<string, string | number | boolean | null>;
+};
+type PreparedDocument = {
+  chunks: (Chunk & { page?: number })[];
+  metadata: DocumentInfo["metadata"];
+  pageCount?: number;
+  emptyPages?: number[];
+};
 
 function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -35,6 +50,47 @@ export class RagService {
 
   async ingest(input: IngestInput) {
     const document = ingestSchema.parse(input);
+    return this.writeDocument(document, async () => ({
+      chunks: chunkText(
+        document.text,
+        this.config.CHUNK_SIZE,
+        this.config.CHUNK_OVERLAP,
+      ),
+      metadata: document.metadata,
+    }));
+  }
+
+  async ingestPdf(input: PdfIngestInput) {
+    const document = pdfIngestSchema.parse(input);
+    return this.writeDocument(document, async () => {
+      const pdf = await extractPdf(document.data);
+      const chunks: PreparedDocument["chunks"] = [];
+      for (const page of pdf.pages) {
+        for (const chunk of chunkText(
+          page.text,
+          this.config.CHUNK_SIZE,
+          this.config.CHUNK_OVERLAP,
+        )) {
+          chunks.push({ ...chunk, chunkIndex: chunks.length, page: page.page });
+        }
+      }
+      return {
+        chunks,
+        metadata: {
+          ...document.metadata,
+          format: "pdf",
+          pageCount: pdf.pageCount,
+        },
+        pageCount: pdf.pageCount,
+        emptyPages: pdf.emptyPages,
+      };
+    });
+  }
+
+  private async writeDocument(
+    document: DocumentInfo,
+    prepare: () => Promise<PreparedDocument>,
+  ) {
     const documentId = digest(
       JSON.stringify([document.namespace, document.source]),
     );
@@ -42,11 +98,9 @@ export class RagService {
     const operation = previous
       .catch(() => {})
       .then(async () => {
-        const chunks = chunkText(
-          document.text,
-          this.config.CHUNK_SIZE,
-          this.config.CHUNK_OVERLAP,
-        );
+        const prepared = await prepare();
+        const { chunks } = prepared;
+        const metadata = ingestSchema.shape.metadata.parse(prepared.metadata);
         // Finish every embedding before touching existing Qdrant points.
         const vectors = await this.embedder.embedDocuments(
           chunks.map((chunk) => chunk.text),
@@ -63,7 +117,7 @@ export class RagService {
               documentId,
               namespace: document.namespace,
               source: document.source,
-              metadata: document.metadata,
+              metadata,
               embeddingModel: this.embedder.model,
             },
           })),
@@ -73,6 +127,9 @@ export class RagService {
           source: document.source,
           namespace: document.namespace,
           chunks: chunks.length,
+          ...(prepared.pageCount !== undefined
+            ? { pageCount: prepared.pageCount, emptyPages: prepared.emptyPages }
+            : {}),
         };
       });
     this.writes.set(documentId, operation);
@@ -97,7 +154,7 @@ export class RagService {
     const context = matches
       .map(
         (hit) =>
-          `${hit.citation} ${JSON.stringify(hit.source)} (lines ${hit.startLine}-${hit.endLine})\n${hit.text}`,
+          `${hit.citation} ${JSON.stringify(hit.source)} (${hit.page ? `page ${hit.page}, ` : ""}lines ${hit.startLine}-${hit.endLine})\n${hit.text}`,
       )
       .join("\n\n");
     const chars = Array.from(context);

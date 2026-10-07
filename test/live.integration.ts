@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { Client } from "@modelcontextprotocol/client";
 import {
   getDefaultEnvironment,
@@ -12,9 +15,13 @@ import { loadConfig } from "../src/config.js";
 import { QwenEmbedder } from "../src/embedding.js";
 import { createRagService } from "../src/rag.js";
 import { QdrantStore } from "../src/store.js";
+import { createHttpServer } from "../src/http-server.js";
+import { close, listen } from "./helpers.js";
+
+const execFileAsync = promisify(execFile);
 
 test(
-  "real Qwen3 + Qdrant: semantic retrieval, replacement, isolation, model guards, and stdio MCP",
+  "real Qwen3 + Qdrant: semantic retrieval, PDF CLI/HTTP imports, page citations, replacement, isolation, and MCP",
   { timeout: 180000 },
   async (t) => {
     const config = {
@@ -109,6 +116,104 @@ test(
       }).ensureCollection(false),
       /mismatch/,
     );
+    const cliPath = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
+    const pdfPath = fileURLToPath(
+      new URL("./fixtures/pdf/knowledge.pdf", import.meta.url),
+    );
+    const cliOptions = {
+      cwd: tmpdir(),
+      env: {
+        ...process.env,
+        ...Object.fromEntries(
+          Object.entries(config).map(([key, value]) => [key, String(value)]),
+        ),
+      },
+    };
+    const importedPdf = await execFileAsync(
+      process.execPath,
+      [
+        cliPath,
+        "ingest",
+        pdfPath,
+        "--namespace",
+        "pdf",
+        "--source",
+        "guide.pdf",
+      ],
+      cliOptions,
+    );
+    assert.equal(JSON.parse(importedPdf.stdout).pageCount, 3);
+    const pdfFound = await rag.search({
+      query: "PDF 导入如何保留原始页码？",
+      namespace: "pdf",
+      source: "guide.pdf",
+      topK: 1,
+    });
+    assert.equal(pdfFound.matches[0]?.page, 3);
+    assert.match(pdfFound.context, /guide\.pdf.*page 3/);
+    const countBeforeFailure = (
+      await store.client.count(config.QDRANT_COLLECTION, { exact: true })
+    ).count;
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          cliPath,
+          "ingest",
+          fileURLToPath(
+            new URL("./fixtures/pdf/image-only.pdf", import.meta.url),
+          ),
+          "--namespace",
+          "pdf",
+          "--source",
+          "guide.pdf",
+        ],
+        cliOptions,
+      ),
+      (error: unknown) =>
+        error instanceof Error &&
+        "stderr" in error &&
+        String(error.stderr).includes("暂不支持扫描件 PDF"),
+    );
+    assert.equal(
+      (await store.client.count(config.QDRANT_COLLECTION, { exact: true }))
+        .count,
+      countBeforeFailure,
+    );
+    const http = createHttpServer(rag);
+    const baseUrl = await listen(http);
+    t.after(() => close(http));
+    const httpImported = await fetch(
+      `${baseUrl}/v1/documents/pdf?source=http-guide.pdf&namespace=pdf-http`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/pdf" },
+        body: new Uint8Array(await readFile(pdfPath)),
+      },
+    );
+    assert.equal(httpImported.status, 200);
+    assert.equal(
+      ((await httpImported.json()) as { pageCount: number }).pageCount,
+      3,
+    );
+    const httpFound = await fetch(`${baseUrl}/v1/tools/call`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "rag_search",
+        arguments: {
+          query: "PDF 导入如何保留原始页码？",
+          namespace: "pdf-http",
+          topK: 1,
+        },
+      }),
+    });
+    assert.equal(httpFound.status, 200);
+    assert.equal(
+      ((await httpFound.json()) as { matches: { page: number }[] }).matches[0]
+        ?.page,
+      3,
+    );
     await assert.rejects(
       new QdrantStore({
         ...config,
@@ -149,8 +254,26 @@ test(
         .source,
       "qdrant.md",
     );
+    const pdfCall = await client.callTool(
+      {
+        name: "rag_search",
+        arguments: {
+          query: "PDF 导入如何保留原始页码？",
+          namespace: "pdf",
+          source: "guide.pdf",
+          topK: 1,
+        },
+      },
+      { timeout: 120000 },
+    );
+    assert.ok(!pdfCall.isError);
+    assert.equal(
+      (pdfCall.structuredContent as { matches: { page: number }[] }).matches[0]
+        ?.page,
+      3,
+    );
     console.log(
-      `Live semantic retrieval passed: ${found.matches[0]!.source}, cosine=${found.matches[0]!.score.toFixed(4)}; stdio MCP passed from another cwd.`,
+      `Live semantic retrieval passed: ${found.matches[0]!.source}, cosine=${found.matches[0]!.score.toFixed(4)}; PDF CLI/HTTP import and page 3 citations passed; stdio MCP passed from another cwd.`,
     );
   },
 );

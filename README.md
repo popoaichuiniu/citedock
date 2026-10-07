@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-  D[Markdown / TXT / 文本] --> C[分块与行号]
+  D[Markdown / TXT / PDF / 文本] --> C[分块、行号与 PDF 页码]
   C --> E[Qwen3 Embedding]
   E --> Q[(Qdrant)]
   L[大模型调用 rag_search] --> S[问题 + 检索指令]
@@ -17,7 +17,7 @@ flowchart LR
 
 ## 快速运行
 
-默认 MLX 方案要求 Apple Silicon Mac、Node.js 22+、npm、Python 3.11+。本次依赖版本要求 macOS 26+；其他平台可使用下方的 Ollama 或 OpenAI 兼容服务配置。Qdrant 使用 Docker 或官方本机二进制。
+默认 MLX 方案要求 Apple Silicon Mac、Node.js 22.13+、npm、Python 3.11+。本次依赖版本要求 macOS 26+；其他平台可使用下方的 Ollama 或 OpenAI 兼容服务配置。Qdrant 使用 Docker 或官方本机二进制。
 
 ```bash
 npm ci
@@ -68,18 +68,25 @@ HTTP 默认监听 `127.0.0.1:3000`，Qdrant 默认 `127.0.0.1:6333`，MLX Embedd
 ## 导入知识库
 
 ```bash
-# 递归导入目录下的 UTF-8 .md / .markdown / .txt
+# 递归导入目录下的 .md / .markdown / .txt / .pdf
 npm run rag -- ingest ./docs --namespace product
 
 # 自定义稳定的来源 ID，便于更新与引用
 npm run rag -- ingest ./docs/guide.md --namespace product --source product-guide
+
+# 导入带文字层的 PDF，按页分块并保留原始页码
+npm run rag -- ingest ./docs/manual.pdf --namespace product
 
 npm run rag -- search "如何配置？" --namespace product --top-k 5 --min-score 0.4
 ```
 
 同一个 `namespace + source` 唯一标识一份文档。重复导入会覆盖已有分块并清理多余旧分块；所有向量计算成功之后才开始写库。不同 namespace 互不覆盖。单文件正文最多 2,000,000 个 UTF-16 单元；分块大小按 Unicode 字符计数，默认 1200 字符、重叠 150 字符，并优先在段落或句末切分。
 
-返回的行号对应原始文本，CRLF/CR 统一为 LF。目录导入跳过隐藏文件、符号链接、node_modules、dist 和 storage。只支持纯文本，PDF/DOCX 需要先提取正文再导入。
+文本文件返回的行号对应原始文本，CRLF/CR 统一为 LF。目录导入跳过隐藏文件、符号链接、node_modules、dist 和 storage。支持 UTF-8 纯文本和带文字层的 PDF；DOCX 需要先提取正文。
+
+PDF 使用 Mozilla PDF.js 在本机提取正文，最大 32 MiB、1000 页，提取后的正文最多 2,000,000 个 UTF-16 单元。按页分块，片段不会跨页；检索结果增加 `page` 字段，context 引用包含原始 PDF 页码，`startLine/endLine` 是该页提取文本内的行号。纯空白页跳过且不改变后续页码，导入结果返回 `pageCount` 和 `emptyPages`。metadata 自动添加 `format=pdf`、`pageCount`。
+
+仅包含图像、没有可提取文字的页面会提示 **“暂不支持扫描件 PDF”**；不进行 OCR。如果文本与扫描页混合，整份 PDF 拒绝导入。加密 PDF 提示先解密，损坏文件提示无法提取。所有页面提取与所有向量生成成功后才开始写库，因此这些导入失败不会覆盖该来源的已有知识。复杂多栏与表格的提取顺序取决于 PDF 的文字层，不保证恢复原版排版。系统保存提取正文和页码，原始 PDF 由调用方保管。
 
 更新单份文档的写操作在一个进程内按顺序执行。向量按每批 64 个分块写入，避免超出 Qdrant 请求限制。批次写入与清理不是跨操作事务；如果写入中途或清理前失败，可能暂时同时存在新旧内容，重试同一文档可以完成更新。多个写入进程更新同一 source 时，需要由调用方协调。目录导入逐文件保存，后续文件失败不会回滚已成功文件。metadata 只允许字符串、数值、布尔值和 null，序列化长度最多 16,384 字符。
 
@@ -111,7 +118,7 @@ npm run rag -- search "如何配置？" --namespace product --top-k 5 --min-scor
 | `source`          | 无        | 精确匹配来源 ID                             |
 | `maxContextChars` | `12000`   | 拼接 context 的 Unicode 字符上限，256–32000 |
 
-返回 `matches`、`context` 和 `truncated`。每个 match 包含 `text`、`source`、`startLine`、`endLine`、`score`、`citation` 和 metadata。`[1]` 等引用编号在本次结果内有效。`maxContextChars` 只限制拼接的 context；matches 保留完整片段。空 matches 表示未找到满足条件的证据。
+返回 `matches`、`context` 和 `truncated`。每个 match 包含 `text`、`source`、`startLine`、`endLine`、`score`、`citation` 和 metadata，PDF 片段还包含 `page`。`[1]` 等引用编号在本次结果内有效。`maxContextChars` 只限制拼接的 context；matches 保留完整片段。空 matches 表示未找到满足条件的证据。
 
 建议给调用模型的系统提示：
 
@@ -119,14 +126,15 @@ npm run rag -- search "如何配置？" --namespace product --top-k 5 --min-scor
 
 ## HTTP 与 Function Calling
 
-| 方法 | 路径             | 用途                                      |
-| ---- | ---------------- | ----------------------------------------- |
-| GET  | `/healthz`       | 进程存活检查                              |
-| GET  | `/readyz`        | 实际检查 Qdrant 和 Embedding 服务         |
-| POST | `/v1/documents`  | 导入/更新正文                             |
-| POST | `/v1/search`     | 检索证据                                  |
-| GET  | `/v1/tools`      | OpenAI Chat Completions 风格的 tools 定义 |
-| POST | `/v1/tools/call` | 执行模型产生的工具调用                    |
+| 方法 | 路径                | 用途                                      |
+| ---- | ------------------- | ----------------------------------------- |
+| GET  | `/healthz`          | 进程存活检查                              |
+| GET  | `/readyz`           | 实际检查 Qdrant 和 Embedding 服务         |
+| POST | `/v1/documents`     | 导入/更新正文                             |
+| POST | `/v1/documents/pdf` | 上传并导入 PDF 二进制                     |
+| POST | `/v1/search`        | 检索证据                                  |
+| GET  | `/v1/tools`         | OpenAI Chat Completions 风格的 tools 定义 |
+| POST | `/v1/tools/call`    | 执行模型产生的工具调用                    |
 
 ```bash
 curl http://127.0.0.1:3000/v1/documents \
@@ -142,7 +150,17 @@ curl http://127.0.0.1:3000/v1/tools/call \
   -d '{"name":"rag_search","arguments":{"query":"用什么检索向量？"}}'
 ```
 
-HTTP JSON 请求上限 8 MiB。设置 `RAG_API_KEY` 后，除 `/healthz` 外都需要 `Authorization: Bearer <key>`。非回环 HTTP_HOST 强制要求该 key。参数错误返回 400，身份验证失败返回 401，依赖服务失败返回 502。namespace 是逻辑筛选条件，不是多用户权限边界；共享部署应由应用鉴权并固定允许访问的 namespace。
+HTTP JSON 请求上限 8 MiB，PDF 上传上限 32 MiB。设置 `RAG_API_KEY` 后，除 `/healthz` 外都需要 `Authorization: Bearer <key>`。非回环 HTTP_HOST 强制要求该 key。参数或 PDF 格式错误返回 400，身份验证失败返回 401，内容类型错误返回 415，超限返回 413，依赖服务失败返回 502。namespace 是逻辑筛选条件，不是多用户权限边界；共享部署应由应用鉴权并固定允许访问的 namespace。
+
+PDF 上传通过查询参数指定必填的 `source` 和可选的 `namespace`，正文直接发送 PDF 二进制，不使用 multipart 或 base64。source/namespace 中的特殊字符需 URL 编码。示例：
+
+```bash
+curl 'http://127.0.0.1:3000/v1/documents/pdf?source=manual.pdf&namespace=product' \
+  -H 'Content-Type: application/pdf' \
+  --data-binary @./docs/manual.pdf
+```
+
+MCP 保持只读，导入后的 PDF 与其他知识通过同一个 `rag_search` 检索。
 
 把 `/v1/tools` 返回的 `tools` 发给支持 Function Calling 的模型；模型返回 `tool_calls` 后，使用 `/v1/tools/call` 或 SDK 执行，再把 JSON 结果作为 `role: "tool"` 消息、带原始 `tool_call_id` 发回模型。完整处理函数见 [examples/function-calling.ts](examples/function-calling.ts)。这里导出的定义用于 Chat Completions；其他模型 API 请按其工具格式转换。
 
@@ -159,6 +177,15 @@ import {
 const rag = createRagService(loadConfig());
 await rag.ingest({ source: "guide", text: "Qdrant 使用向量检索知识库。" });
 const evidence = await rag.search({ query: "如何检索知识库？" });
+
+// 导入 PDF（Node.js）
+const { readFile } = await import("node:fs/promises");
+await rag.ingestPdf({
+  source: "manual.pdf",
+  data: await readFile("./docs/manual.pdf"),
+  namespace: "product",
+  metadata: { category: "reference" },
+});
 
 // 给支持工具调用的模型传入 tools: [searchTool]
 // 从模型得到工具名与 JSON 参数后执行：
@@ -209,6 +236,8 @@ npm run test:mlx
 npm run test:live
 ```
 
-独立测试覆盖 Unicode 分块、文档更新、并发写入顺序、失败保留旧数据、向量响应验证、HTTP 鉴权与错误处理、Qdrant 筛选以及 MCP 协议调用。真实联调还验证向量维度、归一化与不同长度文本批量嵌入的一致性；创建独立 `rag_test_*` 集合并自动删除，验证中文语义检索、重复导入、缩短文档清理、namespace 隔离、配置校验，以及从其他工作目录启动 MCP 并调用检索。
+独立测试覆盖 Unicode 分块、文档更新、并发写入顺序、失败保留旧数据、向量响应验证、HTTP 鉴权与错误处理、Qdrant 筛选以及 MCP 协议调用。PDF 测试使用实际中英文、扫描、混合扫描页与加密文件，验证页码、空白页、重复导入、失败保留旧知识、PDF/文本更新顺序和二进制 HTTP 上传。
 
-参考：[Qwen3 官方模型卡](https://huggingface.co/Qwen/Qwen3-Embedding-8B)、[Apple MLX-LM](https://github.com/ml-explore/mlx-lm)、[Ollama Qwen3 Embedding](https://ollama.com/library/qwen3-embedding)、[Qdrant 文档](https://qdrant.tech/documentation/)、[MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/v2/)。
+真实联调还验证向量维度、归一化与不同长度文本批量嵌入的一致性；创建独立 `rag_test_*` 集合并自动删除，验证中文语义检索、重复导入、缩短文档清理、namespace 隔离、配置校验、从其他工作目录通过 CLI 导入 PDF，以及通过 HTTP/MCP 检索并返回第 3 页引用。
+
+参考：[Qwen3 官方模型卡](https://huggingface.co/Qwen/Qwen3-Embedding-8B)、[Apple MLX-LM](https://github.com/ml-explore/mlx-lm)、[Ollama Qwen3 Embedding](https://ollama.com/library/qwen3-embedding)、[Mozilla PDF.js](https://github.com/mozilla/pdf.js)、[Qdrant 文档](https://qdrant.tech/documentation/)、[MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/v2/)。
