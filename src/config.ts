@@ -11,12 +11,16 @@ const httpUrl = z
 const positiveInt = z.coerce.number().int().positive();
 const envSchema = z
   .object({
-    EMBEDDING_PROVIDER: z.enum(["ollama", "openai"]).default("ollama"),
-    EMBEDDING_BASE_URL: httpUrl.default("http://127.0.0.1:11434"),
-    EMBEDDING_MODEL: z.string().trim().min(1).default("qwen3-embedding:0.6b"),
-    EMBEDDING_DIMENSIONS: positiveInt.max(4096).default(1024),
-    EMBEDDING_BATCH_SIZE: positiveInt.max(128).default(16),
-    EMBEDDING_TIMEOUT_MS: positiveInt.default(120000),
+    EMBEDDING_PROVIDER: z.enum(["ollama", "openai"]).default("openai"),
+    EMBEDDING_BASE_URL: httpUrl.default("http://127.0.0.1:8000/v1"),
+    EMBEDDING_MODEL: z
+      .string()
+      .trim()
+      .min(1)
+      .default("mlx-community/Qwen3-Embedding-8B-4bit-DWQ"),
+    EMBEDDING_DIMENSIONS: positiveInt.max(4096).default(4096),
+    EMBEDDING_BATCH_SIZE: positiveInt.max(128).default(4),
+    EMBEDDING_TIMEOUT_MS: positiveInt.default(180000),
     EMBEDDING_API_KEY: z.string().default(""),
     QUERY_INSTRUCTION: z
       .string()
@@ -30,7 +34,7 @@ const envSchema = z
     QDRANT_COLLECTION: z
       .string()
       .regex(/^[\w-]+$/)
-      .default("rag_qwen3_06b"),
+      .default("rag_qwen3_8b_mlx"),
     QDRANT_TIMEOUT_MS: positiveInt.default(30000),
     CHUNK_SIZE: positiveInt.min(32).max(16000).default(1200),
     CHUNK_OVERLAP: z.coerce.number().int().nonnegative().default(150),

@@ -7,3 +7,4 @@ dist/
 storage/
 coverage/
 .DS_Store
+__pycache__/

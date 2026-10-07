@@ -1,7 +1,7 @@
 # 知识库检索工具
 
-本项目使用 TypeScript 实现 RAG，Qdrant 存储向量，Ollama 运行 Qwen3 Embedding。
-默认使用 qwen3-embedding:0.6b，生成 1024 维向量。Qdrant 使用 Cosine 相似度检索。
+本项目使用 TypeScript 实现 RAG，Qdrant 存储向量，Apple MLX 在本机运行 Qwen3 Embedding。
+默认使用 Qwen3-Embedding-8B 的社区 4-bit MLX 转换版，生成 4096 维向量。Qdrant 使用 Cosine 相似度检索。
 
 ## 文档导入
 

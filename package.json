@@ -21,7 +21,9 @@
     "dev": "tsx src/http.ts",
     "mcp": "node dist/mcp.js",
     "rag": "tsx src/cli.ts",
-    "qdrant": "bash scripts/qdrant-local.sh"
+    "qdrant": "bash scripts/qdrant-local.sh",
+    "mlx": "bash scripts/mlx-local.sh",
+    "test:mlx": ".local/mlx-venv/bin/python -m unittest discover -s test -p '*_test.py'"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.3.1",

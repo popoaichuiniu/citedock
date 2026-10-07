@@ -1,6 +1,6 @@
 # Qwen3 + Qdrant RAG
 
-一个可供大模型调用的 TypeScript 知识库工具。默认使用 **Ollama 的 `qwen3-embedding:0.6b`**，通过 **Qdrant** 持久化向量，对外提供 **MCP stdio、HTTP API、Function Calling 定义和 TypeScript SDK**。
+一个可供大模型调用的 TypeScript 知识库工具。默认使用 **Qwen3-Embedding-8B 的 4-bit MLX 社区转换版**，生成 **4096 维**向量，通过 **Qdrant** 持久化，对外提供 **MCP stdio、HTTP API、Function Calling 定义和 TypeScript SDK**。RAG 逻辑使用 TypeScript，Apple MLX 推理使用独立的本机 Python 服务。
 
 ```mermaid
 flowchart LR
@@ -17,15 +17,20 @@ flowchart LR
 
 ## 快速运行
 
-要求 Node.js 22+、npm、Ollama；Qdrant 使用 Docker 或官方本机二进制。
+默认 MLX 方案要求 Apple Silicon Mac、Node.js 22+、npm、Python 3.11+。本次依赖版本要求 macOS 26+；其他平台可使用下方的 Ollama 或 OpenAI 兼容服务配置。Qdrant 使用 Docker 或官方本机二进制。
 
 ```bash
 npm ci
 cp .env.example .env
-ollama pull qwen3-embedding:0.6b
 ```
 
-如果 Ollama 尚未运行，在单独终端执行 `ollama serve`。
+单独终端启动 MLX 推理服务（前台运行）：
+
+```bash
+npm run mlx
+```
+
+首次运行会创建 `.local/mlx-venv`，安装固定版本的 MLX 依赖，并下载约 4.26 GB 的模型权重，缓存保存在 `.local/huggingface`。如果 Python 不在 PATH 中，使用 `MLX_PYTHON=/absolute/path/to/python3 npm run mlx`。等待日志出现 `MLX embeddings ready` 后再导入文档。
 
 启动 Qdrant，任选一种：
 
@@ -48,7 +53,17 @@ npm run rag -- search "这个项目如何给大模型调用？"
 npm start
 ```
 
-HTTP 默认监听 `127.0.0.1:3000`，Qdrant 默认 `127.0.0.1:6333`，Ollama 默认 `127.0.0.1:11434`。`npm run dev` 可直接运行 TypeScript HTTP 服务。
+HTTP 默认监听 `127.0.0.1:3000`，Qdrant 默认 `127.0.0.1:6333`，MLX Embedding 默认 `127.0.0.1:8000`。`npm run dev` 可直接运行 TypeScript HTTP 服务。
+
+## 8B MLX 模型与精度
+
+使用 [mlx-community/Qwen3-Embedding-8B-4bit-DWQ](https://huggingface.co/mlx-community/Qwen3-Embedding-8B-4bit-DWQ)，来源是官方 [Qwen/Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B)。固定模型 revision 为 `885642d6b98742ea03b77a1673579c92ca961efd`，避免远端更新改变已有向量的含义。
+
+它是官方 8B 模型的社区转换与 4-bit 量化版本，权重数值和输出向量与官方 BF16 原始版本有差异。本项目的联调验证功能和语义检索，不代表完成了两种精度的效果对比。不能把官方原始模型的评测分数直接当成这个量化版本的分数。
+
+推理通过 Apple 官方 `mlx-lm` 加载 Qwen3 主干，取最后一个有效 token 的 hidden state，再进行 L2 归一化，与 Qwen 官方 Embedding 的池化方式一致。每条输入单独执行，避免补齐 token 影响因果注意力；批量请求保留原始顺序，GPU 推理串行进行。不套用对话模板，也不使用生成 token 的 logits 作为向量。
+
+本机服务默认限制每条输入为 8192 tokens，超长请求返回 400，不静默截断；可通过 `npm run mlx -- --max-tokens 32768` 调整到模型声明的 32K 上限，长输入会增加内存占用。TS 默认每批发送 4 条文本，适用于本机知识库导入。MLX `/healthz` 返回已加载模型、固定 revision、维度和 token 上限。
 
 ## 导入知识库
 
@@ -154,17 +169,27 @@ const result = await executeTool(rag, "rag_search", {
 
 ## 切换模型服务
 
-默认调用 Ollama `/api/embed`，显式设置 `truncate: false`，避免过长文本被静默截断。检索问题加 `Instruct: ...\nQuery: ...`，文档不加指令。返回向量按配置维度截取后进行 L2 归一化，支持 Qwen3 的 Matryoshka 维度。
+默认通过 OpenAI 兼容协议调用本机 MLX `/v1/embeddings`。检索问题加 `Instruct: ...\nQuery: ...`，文档不加指令。返回向量按配置维度截取后进行 L2 归一化，支持 Qwen3 的 Matryoshka 维度。
 
-可以使用提供 Qwen3 Embedding 的 OpenAI 兼容服务：
+也可以使用 Ollama 的 8B 模型（使用 Ollama 支持的运行格式；不是上述 MLX 权重）：先执行 `ollama pull qwen3-embedding:8b`，确保 Ollama 服务运行，然后修改 `.env`：
+
+```dotenv
+EMBEDDING_PROVIDER=ollama
+EMBEDDING_BASE_URL=http://127.0.0.1:11434
+EMBEDDING_MODEL=qwen3-embedding:8b
+EMBEDDING_DIMENSIONS=4096
+QDRANT_COLLECTION=rag_qwen3_8b_ollama
+```
+
+Ollama 请求显式设置 `truncate: false`。使用提供官方原始 Qwen3 Embedding 的 OpenAI 兼容服务时，例如：
 
 ```dotenv
 EMBEDDING_PROVIDER=openai
 EMBEDDING_BASE_URL=http://127.0.0.1:8000/v1
-EMBEDDING_MODEL=Qwen/Qwen3-Embedding-0.6B
-EMBEDDING_DIMENSIONS=1024
+EMBEDDING_MODEL=Qwen/Qwen3-Embedding-8B
+EMBEDDING_DIMENSIONS=4096
 EMBEDDING_API_KEY=
-QDRANT_COLLECTION=rag_qwen3_vllm
+QDRANT_COLLECTION=rag_qwen3_8b_vllm
 ```
 
 BASE_URL 包含 `/v1`，代码再追加 `/embeddings`。必须配置真实的 Embedding 模型，不能使用 Qwen3 对话模型。0.6B、4B、8B 的最大维度分别为 1024、2560、4096；Ollama 名称分别为 `qwen3-embedding:0.6b`、`:4b`、`:8b`。自定义服务别名以服务实际名称为准。
@@ -177,10 +202,13 @@ BASE_URL 包含 `/v1`，代码再追加 `/embeddings`。必须配置真实的 Em
 # 类型检查、独立测试、编译
 npm run check
 
-# 真实 Qdrant + Ollama 联调，先启动两者并执行 npm run build
+# MLX HTTP 合约与输入验证，不加载权重（先运行 npm run mlx 安装依赖）
+npm run test:mlx
+
+# 真实 Qdrant + Embedding 联调，先启动两者并执行 npm run build
 npm run test:live
 ```
 
-独立测试覆盖 Unicode 分块、文档更新、并发写入顺序、失败保留旧数据、向量响应验证、HTTP 鉴权与错误处理、Qdrant 筛选以及 MCP 协议调用。真实联调会创建独立 `rag_test_*` 集合并自动删除，验证中文语义检索、重复导入、缩短文档清理、namespace 隔离、配置校验，以及从其他工作目录启动 MCP 并调用检索。
+独立测试覆盖 Unicode 分块、文档更新、并发写入顺序、失败保留旧数据、向量响应验证、HTTP 鉴权与错误处理、Qdrant 筛选以及 MCP 协议调用。真实联调还验证向量维度、归一化与不同长度文本批量嵌入的一致性；创建独立 `rag_test_*` 集合并自动删除，验证中文语义检索、重复导入、缩短文档清理、namespace 隔离、配置校验，以及从其他工作目录启动 MCP 并调用检索。
 
-参考：[Qwen3 官方模型卡](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B)、[Ollama Qwen3 Embedding](https://ollama.com/library/qwen3-embedding)、[Qdrant 文档](https://qdrant.tech/documentation/)、[MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/v2/)。
+参考：[Qwen3 官方模型卡](https://huggingface.co/Qwen/Qwen3-Embedding-8B)、[Apple MLX-LM](https://github.com/ml-explore/mlx-lm)、[Ollama Qwen3 Embedding](https://ollama.com/library/qwen3-embedding)、[Qdrant 文档](https://qdrant.tech/documentation/)、[MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/v2/)。

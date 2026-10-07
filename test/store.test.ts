@@ -11,7 +11,7 @@ function collectionInfo(overrides: Record<string, unknown> = {}) {
       metadata: {
         ragSchemaVersion: 1,
         embeddingModel: config.EMBEDDING_MODEL,
-        embeddingProvider: "ollama",
+        embeddingProvider: config.EMBEDDING_PROVIDER,
         ...overrides,
       },
     },

@@ -9,6 +9,7 @@ import {
 } from "@modelcontextprotocol/client/stdio";
 import { test } from "node:test";
 import { loadConfig } from "../src/config.js";
+import { QwenEmbedder } from "../src/embedding.js";
 import { createRagService } from "../src/rag.js";
 import { QdrantStore } from "../src/store.js";
 
@@ -23,6 +24,19 @@ test(
       CHUNK_OVERLAP: 16,
     };
     const rag = createRagService(config);
+    const embedder = new QwenEmbedder(config);
+    const shortText = "香蕉是一种水果。";
+    const single = (await embedder.embedDocuments([shortText]))[0]!;
+    const batched = await embedder.embedDocuments([
+      "Qdrant 是向量数据库。".repeat(10),
+      shortText,
+    ]);
+    assert.equal(single.length, config.EMBEDDING_DIMENSIONS);
+    assert.ok(Math.abs(Math.hypot(...single) - 1) < 1e-6);
+    assert.ok(
+      Math.hypot(...single.map((v, i) => v - batched[1]![i]!)) < 1e-5,
+      "Batching with a longer input must not change the short input's embedding",
+    );
     const store = new QdrantStore(config);
     t.after(async () => {
       if (

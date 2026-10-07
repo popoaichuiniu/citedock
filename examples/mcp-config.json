@@ -5,7 +5,7 @@
       "args": ["/ABSOLUTE/PATH/TO/rag/dist/mcp.js"],
       "env": {
         "QDRANT_URL": "http://127.0.0.1:6333",
-        "EMBEDDING_BASE_URL": "http://127.0.0.1:11434"
+        "EMBEDDING_BASE_URL": "http://127.0.0.1:8000/v1"
       }
     }
   }

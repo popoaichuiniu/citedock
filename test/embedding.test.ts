@@ -19,6 +19,7 @@ test("Ollama adapter batches documents, instructs queries, disables truncation, 
   t.after(() => close(server));
   const embedder = new QwenEmbedder(
     parseConfig({
+      EMBEDDING_PROVIDER: "ollama",
       EMBEDDING_BASE_URL: baseUrl,
       EMBEDDING_BATCH_SIZE: "2",
       EMBEDDING_DIMENSIONS: "2",
@@ -81,7 +82,11 @@ test("embedding adapter rejects upstream failures, bad counts, short and zero ve
   const baseUrl = await listen(server);
   t.after(() => close(server));
   const embedder = new QwenEmbedder(
-    parseConfig({ EMBEDDING_BASE_URL: baseUrl, EMBEDDING_DIMENSIONS: "2" }),
+    parseConfig({
+      EMBEDDING_PROVIDER: "ollama",
+      EMBEDDING_BASE_URL: baseUrl,
+      EMBEDDING_DIMENSIONS: "2",
+    }),
   );
   await assert.rejects(embedder.embedDocuments(["doc"]), /zero vector/);
   body = { embeddings: [[1]] };
