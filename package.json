@@ -1,0 +1,42 @@
+{
+  "name": "qwen-qdrant-rag",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript RAG tools backed by Qdrant and Qwen3 Embedding",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "test": "node --import tsx --test test/*.test.ts",
+    "test:live": "node --import tsx --test test/live.integration.ts",
+    "check": "npm run typecheck && npm test && npm run build",
+    "format": "prettier --write src test examples README.md package.json tsconfig*.json",
+    "start": "node dist/http.js",
+    "dev": "tsx src/http.ts",
+    "mcp": "node dist/mcp.js",
+    "rag": "tsx src/cli.ts",
+    "qdrant": "bash scripts/qdrant-local.sh"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.3.1",
+    "@qdrant/js-client-rest": "1.19.0",
+    "dotenv": "^18.0.5",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.3.1",
+    "@types/node": "^22.19.0",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "undici": "7.30.0"
+  }
+}
