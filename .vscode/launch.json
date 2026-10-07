@@ -1,0 +1,69 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "RAG：导入资料",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--import", "tsx"],
+      "args": [
+        "${workspaceFolder}/src/cli.ts",
+        "ingest",
+        "${input:ragDocumentPath}",
+        "--namespace",
+        "${input:ragNamespace}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "sourceMaps": true,
+      "outFiles": [],
+      "resolveSourceMapLocations": ["${workspaceFolder}/src/**"],
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"]
+    },
+    {
+      "name": "RAG：检索资料",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--import", "tsx"],
+      "args": [
+        "${workspaceFolder}/src/cli.ts",
+        "search",
+        "${input:ragQuery}",
+        "--namespace",
+        "${input:ragNamespace}",
+        "--top-k",
+        "5"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "sourceMaps": true,
+      "outFiles": [],
+      "resolveSourceMapLocations": ["${workspaceFolder}/src/**"],
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "ragDocumentPath",
+      "type": "promptString",
+      "description": "要导入的文件或目录路径，相对路径从项目根目录计算",
+      "default": "examples/knowledge.md"
+    },
+    {
+      "id": "ragNamespace",
+      "type": "promptString",
+      "description": "知识库名称；导入和检索时使用相同名称",
+      "default": "default"
+    },
+    {
+      "id": "ragQuery",
+      "type": "promptString",
+      "description": "要检索的问题",
+      "default": "文档如何分块？"
+    }
+  ]
+}
