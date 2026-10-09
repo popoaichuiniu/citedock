@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "qwen-rag": {
+    "citedock": {
       "command": "node",
-      "args": ["/ABSOLUTE/PATH/TO/rag/dist/mcp.js"],
+      "args": ["/ABSOLUTE/PATH/TO/citedock/dist/mcp.js"],
       "env": {
         "QDRANT_URL": "http://127.0.0.1:6333",
         "EMBEDDING_BASE_URL": "http://127.0.0.1:8000/v1"

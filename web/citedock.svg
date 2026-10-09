@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <title>CiteDock</title>
+  <rect width="80" height="80" rx="22" fill="#354FD7"/>
+  <path d="M27 24H20V56H27M53 24H60V56H53" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M34 30H46M34 40H46M34 50H42" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="57" cy="59" r="8" fill="#B5E9D5"/>
+</svg>

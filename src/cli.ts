@@ -7,7 +7,9 @@ import { createRagService } from "./rag.js";
 import { MAX_PDF_BYTES } from "./schema.js";
 import { ragTools } from "./tools.js";
 
-const usage = `Usage:
+const usage = `CiteDock — local knowledge tools for AI agents
+
+Usage:
   npm run rag -- ingest <file-or-directory> [--namespace default] [--source source-id]
   npm run rag -- search "question" [--namespace default] [--top-k 5] [--min-score 0.4] [--source source-id]
   npm run rag -- health

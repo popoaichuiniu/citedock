@@ -1,0 +1,117 @@
+{
+  "measuredOn": "2026-10-07",
+  "machine": {
+    "chip": "Apple M5",
+    "memoryGiB": 24,
+    "os": "macOS 27.0.1 arm64"
+  },
+  "engine": {
+    "name": "MLX",
+    "mlx": "0.32.3",
+    "mlxLm": "0.32.0",
+    "dimensions": 4096,
+    "pooling": "last non-padding token",
+    "normalization": "float32 L2",
+    "inference": "serial unpadded inputs"
+  },
+  "models": {
+    "current": {
+      "name": "mlx-community/Qwen3-Embedding-8B-4bit-DWQ",
+      "revision": "885642d6b98742ea03b77a1673579c92ca961efd"
+    },
+    "official": {
+      "name": "Qwen/Qwen3-Embedding-8B",
+      "revision": "1d8ad4ca9b3dd8059ad90a75d4983776a23d44af"
+    }
+  },
+  "datasets": {
+    "stsb": {
+      "current": {
+        "cosineSpearman": 0.8627085555318905,
+        "cosinePearson": 0.8530164206936122
+      },
+      "official": {
+        "cosineSpearman": 0.8624862409709845,
+        "cosinePearson": 0.852503837774053
+      },
+      "paired": {
+        "cosineSpearman": {
+          "delta": -0.00022231456090604507,
+          "bootstrap95": [-0.0026019520364803845, 0.002169248141385307]
+        }
+      },
+      "count": 1361,
+      "documents": null,
+      "inputFingerprint": "1255e305c8a4f071dab71c649adbd9c0fb5f3bb739e50098cf8fb58002e86af5",
+      "encodingMs": {
+        "current": 323659.7392530001,
+        "official": 406967.3610359995
+      },
+      "tokens": 63916
+    },
+    "scifact": {
+      "current": {
+        "P_10": 0.10266666666666666,
+        "recall_10": 0.903888888888889,
+        "ndcg_cut_10": 0.7864257375306496,
+        "map_cut_10": 0.7437760582010582,
+        "hit1": 0.67,
+        "hit5": 0.87,
+        "hit10": 0.9066666666666666,
+        "mrr10": 0.7536190476190476
+      },
+      "official": {
+        "P_10": 0.10399999999999998,
+        "recall_10": 0.9133333333333333,
+        "ndcg_cut_10": 0.7875801114868894,
+        "map_cut_10": 0.7435365079365079,
+        "hit1": 0.6666666666666666,
+        "hit5": 0.86,
+        "hit10": 0.9133333333333333,
+        "mrr10": 0.7499695767195766
+      },
+      "paired": {
+        "P_10": {
+          "delta": 0.0013333333333333335,
+          "bootstrap95": [-0.0003333333333333334, 0.003]
+        },
+        "recall_10": {
+          "delta": 0.009444444444444445,
+          "bootstrap95": [-0.0033333333333333335, 0.024444444444444446]
+        },
+        "ndcg_cut_10": {
+          "delta": 0.0011543739562398243,
+          "bootstrap95": [-0.0078054145064255336, 0.009985087052963528]
+        },
+        "map_cut_10": {
+          "delta": -0.00023955026455026415,
+          "bootstrap95": [-0.010837966269841272, 0.010084021164021163]
+        },
+        "hit1": {
+          "delta": -0.0033333333333333335,
+          "bootstrap95": [-0.023333333333333334, 0.016666666666666666]
+        },
+        "hit5": {
+          "delta": -0.01,
+          "bootstrap95": [-0.02666666666666667, 0.006666666666666667]
+        },
+        "hit10": {
+          "delta": 0.006666666666666667,
+          "bootstrap95": [-0.006666666666666667, 0.02]
+        },
+        "mrr10": {
+          "delta": -0.0036494708994709,
+          "bootstrap95": [-0.01537744708994709, 0.007580853174603173]
+        }
+      },
+      "count": 300,
+      "documents": 5183,
+      "inputFingerprint": "5d4e909a1b0cbda1b62abcbee779505f912640af54771296857dbfe7759f7f45",
+      "encodingMs": {
+        "current": 2562165.855039997,
+        "official": 2667511.863700998
+      },
+      "tokens": 1718334
+    }
+  }
+}

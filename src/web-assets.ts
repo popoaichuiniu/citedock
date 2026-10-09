@@ -17,6 +17,13 @@ const assets = new Map([
       type: "text/javascript",
     },
   ],
+  [
+    "/assets/citedock.svg",
+    {
+      file: new URL("../web/citedock.svg", import.meta.url),
+      type: "image/svg+xml",
+    },
+  ],
 ]);
 
 export async function serveWebAsset(

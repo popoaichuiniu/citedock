@@ -1,6 +1,6 @@
-# 知识库检索工具
+# CiteDock 知识库工具
 
-本项目使用 TypeScript 实现 RAG，Qdrant 存储向量，Apple MLX 在本机运行 Qwen3 Embedding。
+CiteDock 是面向 AI Agent 的本地知识库工具。TypeScript 实现 RAG，Qdrant 存储向量，Apple MLX 在本机运行 Qwen3 Embedding。
 默认使用 Qwen3-Embedding-8B 的社区 4-bit MLX 转换版，生成 4096 维向量。Qdrant 使用 Cosine 相似度检索。
 
 ## 文档导入

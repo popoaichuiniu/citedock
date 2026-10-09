@@ -1,8 +1,8 @@
 {
-  "name": "qwen-qdrant-rag",
+  "name": "citedock",
   "version": "0.1.0",
   "private": true,
-  "description": "TypeScript RAG tools backed by Qdrant and Qwen3 Embedding",
+  "description": "Local knowledge tools for AI agents: MCP, document CRUD, PDF citations, Qdrant, and Qwen3 embeddings.",
   "type": "module",
   "engines": {
     "node": ">=22.13.0"
@@ -42,5 +42,20 @@
   },
   "overrides": {
     "undici": "7.30.0"
-  }
+  },
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "rag",
+    "qdrant",
+    "qwen3",
+    "mlx",
+    "typescript",
+    "knowledge-base",
+    "semantic-search",
+    "pdf",
+    "ai-agents",
+    "local-first"
+  ]
 }

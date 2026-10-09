@@ -13,7 +13,7 @@ try {
   });
   server.listen(config.HTTP_PORT, config.HTTP_HOST, () =>
     console.error(
-      `RAG HTTP API listening on http://${config.HTTP_HOST}:${config.HTTP_PORT}`,
+      `CiteDock listening on http://${config.HTTP_HOST}:${config.HTTP_PORT}`,
     ),
   );
   for (const signal of ["SIGINT", "SIGTERM"] as const) {

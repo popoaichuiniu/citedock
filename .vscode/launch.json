@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "RAG：导入资料",
+      "name": "CiteDock：导入资料",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "node",
@@ -24,7 +24,7 @@
       "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"]
     },
     {
-      "name": "RAG：检索资料",
+      "name": "CiteDock：检索资料",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "node",

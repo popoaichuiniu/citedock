@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+<rect width="1200" height="630" fill="#F6F8FC"/><circle cx="1150" cy="40" r="240" fill="#E8ECFF"/><circle cx="1070" cy="590" r="170" fill="#E3F5F1"/>
+<rect x="80" y="80" width="88" height="88" rx="23" fill="#354FD7"/>
+<path d="M110 104h-10v39h10m29-39h10v39h-10M118 112h12m-12 12h12m-12 12h12" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/><circle cx="145" cy="148" r="9" fill="#85E0CA"/>
+<text x="192" y="144" font-family="Arial, sans-serif" font-size="60" font-weight="700" fill="#15213D">CiteDock</text>
+<text x="80" y="258" font-family="Arial, sans-serif" font-size="48" font-weight="700" fill="#15213D">Local knowledge for your AI agents.</text>
+<text x="80" y="328" font-family="Arial, sans-serif" font-size="38" fill="#354FD7">Search. Cite. Maintain.</text>
+<text x="80" y="414" font-family="Arial, sans-serif" font-size="26" fill="#53617A">6 MCP tools · PDF page citations · Document CRUD</text>
+<text x="80" y="454" font-family="Arial, sans-serif" font-size="26" fill="#53617A">Web dashboard · Local embeddings</text>
+<line x1="80" y1="514" x2="1120" y2="514" stroke="#D8DFEC" stroke-width="2"/>
+<text x="80" y="566" font-family="Arial, sans-serif" font-size="24" fill="#53617A">TypeScript + Qdrant + Qwen3 Embedding</text>
+<text x="1016" y="566" font-family="Arial, sans-serif" font-size="24" fill="#354FD7">MIT</text>
+</svg>

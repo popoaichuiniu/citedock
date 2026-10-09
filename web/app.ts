@@ -163,7 +163,7 @@ function setView(view: View) {
   element("page-title").textContent = headings[view][0];
   element("breadcrumb-current").textContent = headings[view][0];
   element("page-subtitle").textContent = headings[view][1];
-  document.title = `${headings[view][0]} · 知识库`;
+  document.title = `${headings[view][0]} · CiteDock`;
 }
 document
   .querySelectorAll<HTMLButtonElement>("[data-view]")
