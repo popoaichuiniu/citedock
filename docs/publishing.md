@@ -1,16 +1,16 @@
 # Publishing CiteDock
 
-This file prepares repository metadata and release copy. It does not imply that a GitHub repository or release has already been published.
+The public repository is [popoaichuiniu/citedock](https://github.com/popoaichuiniu/citedock), with `main` as the source branch. This file records repository metadata and preparation for future releases; no release or npm package has been published.
 
 ## Repository metadata
 
-Suggested repository name: **citedock**
+Repository name: **citedock**
 
-Suggested About description:
+About description:
 
 > A local knowledge base for AI agents. Search, cite, and manage documents through MCP, with Qdrant, Qwen3 embeddings, and a web UI.
 
-Suggested topics:
+Topics:
 
 ```text
 mcp mcp-server rag qdrant qwen3 embeddings mlx typescript
@@ -19,13 +19,13 @@ knowledge-base semantic-search pdf ai-agents local-first document-management
 
 The name connects citations with a place where documents and agents meet. A preliminary public search found no clear software match; it is not a trademark clearance or proof that every package namespace is available. The package remains private and is not being published to npm.
 
-## Before the first public push
+## Maintaining the public repository
 
-1. Choose the GitHub owner and create the repository. This checkout currently has no configured remote.
-2. Review the [MIT license](../LICENSE), tracked files, commit history, and demo assets for anything you do not want public.
-3. Push the prepared source to your chosen remote. README links are relative, so they work without a hardcoded owner.
-4. Enable the workflow and confirm the actual GitHub CI result before adding a status badge.
-5. Enable private vulnerability reporting and set GitHub About and topics using the copy above.
+1. Review the [MIT license](../LICENSE), tracked files, commit history, and demo assets before publishing new changes.
+2. Commit the prepared source and push to `origin/main` at the repository above.
+3. Confirm the actual GitHub CI result before adding a status badge or creating a release.
+4. Keep GitHub About and topics aligned with the copy above.
+5. Enable private vulnerability reporting in repository settings.
 6. Use [the social preview](assets/social-preview.png) for the repository image and the real [dashboard](assets/dashboard.png), [PDF citations](assets/pdf-citations.png), and [search](assets/search.png) screenshots for a demo.
 7. Create the first release only when you are ready; use [the changelog](../CHANGELOG.md) as the basis.
 

@@ -35,9 +35,11 @@ CiteDock returns evidence. The calling language model uses that evidence to writ
 
 Requirements: **Node.js 22.13+**, npm, **Python 3.11+**, and **macOS 26+** for the pinned MLX dependencies. The default model downloads approximately **4.26 GB** of weights on first run. Our local measurements used an Apple M5 with 24 GiB memory.
 
-From a cloned or downloaded copy of this repository:
+Clone the repository and install the dependencies:
 
 ```bash
+git clone https://github.com/popoaichuiniu/citedock.git
+cd citedock
 npm ci
 cp .env.example .env
 npm run build

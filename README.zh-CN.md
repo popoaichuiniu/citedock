@@ -35,9 +35,11 @@
 
 需要 **Node.js 22.13+、npm、Python 3.11+、macOS 26+**。首次启动 MLX 会下载约 **4.26 GB** 模型权重；本机测试环境为 Apple M5、24 GiB 内存。
 
-在克隆或下载的仓库目录中执行：
+克隆仓库并安装依赖：
 
 ```bash
+git clone https://github.com/popoaichuiniu/citedock.git
+cd citedock
 npm ci
 cp .env.example .env
 npm run build

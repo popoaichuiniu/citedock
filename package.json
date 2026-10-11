@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "description": "Local knowledge tools for AI agents: MCP, document CRUD, PDF citations, Qdrant, and Qwen3 embeddings.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/popoaichuiniu/citedock.git"
+  },
+  "homepage": "https://github.com/popoaichuiniu/citedock#readme",
+  "bugs": {
+    "url": "https://github.com/popoaichuiniu/citedock/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=22.13.0"
