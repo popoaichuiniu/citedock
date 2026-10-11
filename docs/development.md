@@ -16,6 +16,7 @@
 | `src/mcp-server.ts`, `src/mcp.ts`   | MCP stdio server                                          |
 | `src/http-server.ts`, `src/http.ts` | HTTP API and process entry point                          |
 | `src/cli.ts`, `src/index.ts`        | CLI and public SDK                                        |
+| `skills/citedock/`                  | Portable agent skill using the six CLI tools              |
 | `web/`, `src/web-assets.ts`         | Dashboard and explicit static asset routes                |
 | `scripts/mlx_embedding_server.py`   | Local MLX inference service                               |
 | `scripts/*-local.sh`                | Local service setup and launch helpers                    |
@@ -60,7 +61,7 @@ npm run build
 npm run test:live
 ```
 
-The live suite uses an isolated temporary collection and deletes it afterward. It exercises actual embeddings, Qdrant, CLI/HTTP PDF imports, citations, replacement, namespace isolation, and MCP launched from another working directory.
+The live suite uses an isolated temporary collection and deletes it afterward. It exercises actual embeddings, Qdrant, all six CLI skill tools, CLI/HTTP PDF imports, citations, replacement, namespace isolation, and MCP launched from another working directory.
 
 MLX contract tests require the helper's local virtual environment:
 

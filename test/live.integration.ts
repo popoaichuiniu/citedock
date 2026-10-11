@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { Client } from "@modelcontextprotocol/client";
@@ -22,7 +23,7 @@ import type { ChunkList, DocumentList } from "../src/schema.js";
 const execFileAsync = promisify(execFile);
 
 test(
-  "real Qwen3 + Qdrant: semantic retrieval, PDF CLI/HTTP imports, page citations, replacement, isolation, and MCP",
+  "real Qwen3 + Qdrant: retrieval, PDFs, citations, isolation, CLI skill CRUD, and MCP",
   { timeout: 180000 },
   async (t) => {
     const config = {
@@ -168,6 +169,74 @@ test(
         ),
       },
     };
+    const argumentsDirectory = await mkdtemp(join(tmpdir(), "citedock-skill-"));
+    t.after(() => rm(argumentsDirectory, { recursive: true, force: true }));
+    const cliCall = async (name: string, args: unknown) => {
+      const file = join(argumentsDirectory, "args.json");
+      await writeFile(file, JSON.stringify(args));
+      const result = await execFileAsync(
+        process.execPath,
+        [cliPath, "call", name, "--args-file", file],
+        cliOptions,
+      );
+      return JSON.parse(result.stdout);
+    };
+    const skillTarget = { namespace: "skill-cli", source: "notes.md" };
+    const skillText =
+      'Qdrant 保存向量。引号 " 和字面量 $(echo secret) `test` 保持原样。';
+    assert.equal(
+      (
+        await cliCall("rag_add_document", {
+          ...skillTarget,
+          text: skillText,
+          metadata: { origin: "skill" },
+        })
+      ).chunks,
+      1,
+    );
+    await assert.rejects(
+      cliCall("rag_add_document", {
+        ...skillTarget,
+        text: "不能误覆盖已有文档",
+      }),
+    );
+    const skillList = await cliCall("rag_list_documents", {
+      namespace: skillTarget.namespace,
+    });
+    assert.equal(skillList.totalDocuments, 1);
+    assert.equal(skillList.documents[0].source, skillTarget.source);
+    const skillRead = await cliCall("rag_get_document", skillTarget);
+    assert.equal(skillRead.chunks[0].text, skillText);
+    assert.equal(skillRead.chunks[0].metadata.origin, "skill");
+    const skillFound = await cliCall("rag_search", {
+      ...skillTarget,
+      query: "什么数据库保存向量？",
+      topK: 1,
+    });
+    assert.equal(skillFound.matches[0].source, skillTarget.source);
+    assert.equal(skillFound.matches[0].citation, "[1]");
+    await cliCall("rag_update_document", {
+      ...skillTarget,
+      text: "完整新正文：Qdrant 持久化保存知识库向量。",
+    });
+    const skillChanged = await cliCall("rag_get_document", skillTarget);
+    assert.equal(
+      skillChanged.chunks[0].text,
+      "完整新正文：Qdrant 持久化保存知识库向量。",
+    );
+    assert.deepEqual(skillChanged.chunks[0].metadata, {});
+    assert.equal(
+      (await cliCall("rag_delete_document", skillTarget)).deletedChunks,
+      1,
+    );
+    assert.equal(
+      (
+        await cliCall("rag_list_documents", {
+          namespace: skillTarget.namespace,
+        })
+      ).totalDocuments,
+      0,
+    );
     const importedPdf = await execFileAsync(
       process.execPath,
       [
@@ -404,7 +473,7 @@ test(
       200,
     );
     console.log(
-      `Live semantic retrieval passed: ${found.matches[0]!.source}, cosine=${found.matches[0]!.score.toFixed(4)}; PDF CLI/HTTP import and page 3 citations passed; stdio MCP passed from another cwd.`,
+      `Live semantic retrieval passed: ${found.matches[0]!.source}, cosine=${found.matches[0]!.score.toFixed(4)}; six CLI skill tools and document lifecycle passed; PDF CLI/HTTP import and page 3 citations passed; stdio MCP passed from another cwd.`,
     );
   },
 );

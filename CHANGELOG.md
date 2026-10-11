@@ -9,6 +9,7 @@ Initial public-source preparation for CiteDock.
 - PDF text extraction with original page citations; scanned PDFs return an unsupported error.
 - Local web dashboard for file import, document/chunk inspection, and retrieval.
 - CLI and TypeScript SDK with shared validation and tool dispatch.
+- Portable CiteDock agent skill and all six tool calls through CLI JSON files or stdin, without MCP registration.
 - Pinned Apple Silicon MLX helper, Ollama support, and OpenAI-compatible embedding endpoints.
 - English and Chinese documentation, MIT license, contribution templates, and CI configuration.
 - Published measurement metadata for Chinese STSB and BEIR SciFact comparisons.

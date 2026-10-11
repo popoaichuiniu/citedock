@@ -1,0 +1,4 @@
+interface:
+  display_name: "CiteDock"
+  short_description: "Search and maintain your local CiteDock knowledge base"
+  default_prompt: "Use $citedock to search my local knowledge base and cite the relevant documents."

@@ -4,7 +4,7 @@
 
 **A local knowledge base your AI agents can search, cite, and maintain.**
 
-[中文](README.zh-CN.md) · [Configuration](docs/configuration.md) · [Tool reference](docs/tools.md) · [Benchmarks](docs/benchmarks.md)
+[中文](README.zh-CN.md) · [Agent skill](docs/skills.md) · [Configuration](docs/configuration.md) · [Tool reference](docs/tools.md) · [Benchmarks](docs/benchmarks.md)
 
 Turn PDFs, Markdown, and notes into knowledge your agents can use. CiteDock exposes six MCP tools to search, read, add, update, and delete documents, with a web dashboard to inspect what is actually stored in Qdrant.
 
@@ -18,7 +18,7 @@ Built with **TypeScript + Qdrant + Qwen3 Embedding**. Run embeddings locally on 
 - **Trace answers to their sources.** Search returns passages, citation markers, line numbers, and original PDF page numbers.
 - **Inspect your data.** Upload files, browse stored documents and chunks, and search from the web dashboard.
 - **Keep retrieval local.** The default stack runs on your machine without a hosted model API.
-- **Integrate your way.** Use MCP stdio, HTTP function calling, the TypeScript SDK, or the CLI.
+- **Integrate your way.** Use an agent skill, MCP stdio, HTTP function calling, the TypeScript SDK, or the CLI.
 
 CiteDock returns evidence. The calling language model uses that evidence to write an answer.
 
@@ -70,6 +70,12 @@ npm run rag -- search "How does CiteDock preserve PDF citations?"
 On other platforms, use `docker compose up -d` for Qdrant and configure [Ollama](docs/configuration.md#ollama) or an [OpenAI-compatible service](docs/configuration.md#openai-compatible-services). The HTTP service, CLI, and MCP server do not require MLX.
 
 ## Connect an AI agent
+
+### Local agent skill
+
+The included [CiteDock skill](skills/citedock/SKILL.md) lets a local agent search, import, read, add, update, and delete documents through the CLI. Keep Qdrant and embeddings running, install the skill, and ask: **"Use $citedock to search my knowledge base and cite the sources."** It works without MCP registration or the web server. See [installation and examples](docs/skills.md).
+
+### MCP stdio
 
 Build the project, keep Qdrant and your embedding service running, then add this configuration to a client that supports **MCP stdio**:
 
@@ -154,7 +160,8 @@ We compared the default 4-bit model with the original BF16 weights on the full C
 ## Documentation and contributions
 
 - [Configuration and troubleshooting](docs/configuration.md)
-- [MCP, HTTP, and SDK reference](docs/tools.md)
+- [Agent skill installation and CLI workflow](docs/skills.md)
+- [MCP, CLI, HTTP, and SDK reference](docs/tools.md)
 - [Source layout and development](docs/development.md)
 - [完整中文使用指南](docs/guide.zh-CN.md)
 - [Embedding benchmark record](docs/benchmarks.md)

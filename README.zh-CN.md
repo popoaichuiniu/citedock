@@ -4,7 +4,7 @@
 
 **让 AI Agent 检索、引用和维护你的本地知识库。**
 
-[English](README.md) · [完整使用指南](docs/guide.zh-CN.md) · [工具接口](docs/tools.md) · [基准记录](docs/benchmarks.md)
+[English](README.md) · [Agent Skill](docs/skills.md) · [完整使用指南](docs/guide.zh-CN.md) · [工具接口](docs/tools.md) · [基准记录](docs/benchmarks.md)
 
 把 PDF、Markdown 和笔记导入 Qdrant，让大模型通过 MCP 查询原文、读取文档、增删改资料。配套网页后台可以上传文件、浏览数据库中的文档和分块、检索知识库。
 
@@ -18,7 +18,7 @@
 - **回答可以追溯**：返回原文、来源、引用编号、行号和 PDF 原始页码。
 - **资料看得见**：网页选择文件导入，浏览实际保存的文档和分块。
 - **检索可以完全本地运行**：默认方案不依赖云端模型 API。
-- **接入方式灵活**：MCP stdio、HTTP Function Calling、TypeScript SDK 和 CLI 共用同一套逻辑。
+- **接入方式灵活**：Agent Skill、MCP stdio、HTTP Function Calling、TypeScript SDK 和 CLI 共用同一套逻辑。
 
 工具返回证据，由调用它的大模型组织答案。网页检索直接展示原文片段。
 
@@ -77,6 +77,12 @@ npm run rag -- search "PDF 如何保留页码？"
 
 ## 大模型怎么调用
 
+### 本地 Agent Skill
+
+仓库提供 [CiteDock Skill](skills/citedock/SKILL.md)，让有命令执行能力的 Agent 通过 CLI 检索、引用、导入、读取和增删改资料。安装后可以说：**“用 $citedock 检索我的知识库，并引用来源。”** 保持 Qdrant 和 Embedding 服务运行即可；不需要配置 MCP 或启动网页。安装步骤和命令示例见[Skill 使用说明](docs/skills.md)。
+
+### MCP stdio
+
 构建项目，保持 Qdrant 和 Embedding 服务运行，在支持 MCP stdio 的客户端添加：
 
 ```json
@@ -119,6 +125,7 @@ HTTP 定义在 `GET /v1/tools`，执行在 `POST /v1/tools/call`。SDK 导出 `r
 
 - [完整中文使用指南](docs/guide.zh-CN.md)
 - [配置与排错](docs/configuration.md)
+- [Skill 安装与 CLI 操作](docs/skills.md)
 - [工具、HTTP 与 SDK 接口](docs/tools.md)
 - [源码结构与开发](docs/development.md)
 - [参与贡献](CONTRIBUTING.md) · [安全说明](SECURITY.md) · [更新记录](CHANGELOG.md)

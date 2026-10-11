@@ -2,7 +2,19 @@
 
 [Home](../README.md) · [Configuration](configuration.md) · [中文完整指南](guide.zh-CN.md)
 
-MCP stdio and HTTP function calling expose the same six tools. `GET /v1/tools`, `npm run rag -- tools`, and the SDK's `ragTools` export provide their definitions.
+MCP stdio, CLI tool calls, and HTTP function calling expose the same six tools. `GET /v1/tools`, `npm run --silent rag -- tools`, and the SDK's `ragTools` export provide their definitions. A portable [agent skill](skills.md) uses the CLI to operate the local knowledge base.
+
+## CLI tool calls
+
+Save the tool's arguments object as a UTF-8 JSON file, then run:
+
+```bash
+npm run --silent rag -- call rag_search --args-file /ABSOLUTE/PATH/TO/args.json
+```
+
+The arguments for this search could be `{"query":"How are PDFs imported?","namespace":"default"}`. Use `--args-file -` to read JSON from stdin. The 8 MiB input limit applies to both files and stdin. All tool arguments belong in the JSON object; flags such as `--namespace` remain available for the older `ingest` and `search` commands.
+
+The CLI uses `RagService` directly with the project's `.env`. No HTTP server or MCP server is required. Success prints JSON; failures use stderr and a nonzero exit status. Use npm's `--silent` option for parseable stdout.
 
 ## Search
 
